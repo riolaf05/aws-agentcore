@@ -1,0 +1,179 @@
+{
+  "agentName": "DailyBriefingAgent",
+  "agentResourceRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/AmazonBedrockExecutionRoleForAgents_dailybriefing",
+  "description": "Agente che genera briefing giornaliero con task ed email importanti",
+  "idleSessionTTLInSeconds": 1800,
+  "foundationModel": "anthropic.claude-3-sonnet-20240229-v1:0",
+  "instruction": "Sei un assistente personale che genera briefing giornalieri. Il tuo compito è:\n\n1. Recuperare task dal database per il periodo richiesto (oggi, domani, settimana)\n2. Recuperare email importanti da Outlook tramite MCP tool\n3. Analizzare task ed email per identificare priorità e urgenze\n4. Generare un briefing conciso e actionable\n5. Fornire suggerimenti per ottimizzare la giornata\n\nLinee guida:\n- Prioritizza informazioni urgenti e importanti\n- Sii conciso ma completo\n- Usa emoji per rendere il briefing più leggibile\n- Fornisci context utile (scadenze, mittenti email importanti)\n- Suggerisci azioni quando opportuno\n\nComunica in italiano in modo professionale ma amichevole.",
+  "actionGroups": [
+    {
+      "actionGroupName": "TaskRetrieval",
+      "description": "Recupera task dal database",
+      "actionGroupExecutor": {
+        "lambda": "${LAMBDA_TASK_GET_ARN}"
+      },
+      "apiSchema": {
+        "payload": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Task Retrieval API",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/tasks": {
+              "get": {
+                "summary": "Recupera task",
+                "description": "Ottiene task dal database con filtri opzionali",
+                "operationId": "getTasks",
+                "parameters": [
+                  {
+                    "name": "due_date",
+                    "in": "query",
+                    "schema": {
+                      "type": "string",
+                      "enum": ["today", "tomorrow", "week", "month"]
+                    },
+                    "description": "Filtra per scadenza"
+                  },
+                  {
+                    "name": "status",
+                    "in": "query",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "description": "Filtra per status (comma-separated)"
+                  },
+                  {
+                    "name": "priority",
+                    "in": "query",
+                    "schema": {
+                      "type": "string",
+                      "enum": ["low", "medium", "high", "urgent"]
+                    },
+                    "description": "Filtra per priorità"
+                  },
+                  {
+                    "name": "category",
+                    "in": "query",
+                    "schema": {
+                      "type": "string"
+                    },
+                    "description": "Filtra per categoria"
+                  },
+                  {
+                    "name": "limit",
+                    "in": "query",
+                    "schema": {
+                      "type": "integer",
+                      "default": 100
+                    },
+                    "description": "Numero massimo di risultati"
+                  }
+                ],
+                "responses": {
+                  "200": {
+                    "description": "Task recuperati con successo",
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "type": "object",
+                          "properties": {
+                            "success": {
+                              "type": "boolean"
+                            },
+                            "count": {
+                              "type": "integer"
+                            },
+                            "tasks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "actionGroupName": "OutlookMCP",
+      "description": "Accesso a email Outlook tramite MCP tool",
+      "actionGroupExecutor": {
+        "lambda": "arn:aws:lambda:${AWS_REGION}:${AWS_ACCOUNT_ID}:function:MCPToolInvoker"
+      },
+      "apiSchema": {
+        "payload": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Outlook MCP Tool API",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/mcp/outlook/emails": {
+              "get": {
+                "summary": "Recupera email da Outlook",
+                "description": "Ottiene email recenti tramite MCP server",
+                "operationId": "getOutlookEmails",
+                "parameters": [
+                  {
+                    "name": "folder",
+                    "in": "query",
+                    "schema": {
+                      "type": "string",
+                      "default": "inbox"
+                    },
+                    "description": "Cartella Outlook"
+                  },
+                  {
+                    "name": "max_results",
+                    "in": "query",
+                    "schema": {
+                      "type": "integer",
+                      "default": 10
+                    },
+                    "description": "Numero massimo di email"
+                  },
+                  {
+                    "name": "filter_important",
+                    "in": "query",
+                    "schema": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "description": "Filtra solo email importanti"
+                  }
+                ],
+                "responses": {
+                  "200": {
+                    "description": "Email recuperate con successo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "promptOverrideConfiguration": {
+    "promptConfigurations": [
+      {
+        "promptType": "ORCHESTRATION",
+        "inferenceConfiguration": {
+          "temperature": 0.5,
+          "topP": 0.9,
+          "maximumLength": 3000
+        },
+        "promptCreationMode": "DEFAULT",
+        "promptState": "ENABLED"
+      }
+    ]
+  }
+}

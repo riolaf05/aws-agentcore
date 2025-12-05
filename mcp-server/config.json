@@ -1,0 +1,112 @@
+{
+  "mcp_server": {
+    "name": "Personal Assistant MCP Server",
+    "version": "1.0.0",
+    "description": "MCP server con tool Outlook per Daily Briefing Agent",
+    "base_url": "${MCP_SERVER_URL}",
+    "authentication": {
+      "type": "bearer",
+      "token": "${MCP_API_KEY}"
+    }
+  },
+  "tools": {
+    "outlook_get_emails": {
+      "enabled": true,
+      "description": "Recupera email da Outlook",
+      "endpoint": "/tools/invoke",
+      "method": "POST",
+      "parameters": {
+        "folder": {
+          "type": "string",
+          "default": "inbox",
+          "description": "Cartella Outlook (inbox, sent, drafts, etc.)"
+        },
+        "max_results": {
+          "type": "integer",
+          "default": 10,
+          "min": 1,
+          "max": 50
+        },
+        "filter": {
+          "type": "object",
+          "properties": {
+            "isImportant": {
+              "type": "boolean"
+            },
+            "isRead": {
+              "type": "boolean"
+            },
+            "hasFlag": {
+              "type": "boolean"
+            },
+            "from_email": {
+              "type": "string"
+            }
+          }
+        },
+        "select": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Campi da includere nella risposta"
+        }
+      },
+      "rate_limit": {
+        "requests_per_minute": 60,
+        "requests_per_hour": 500
+      }
+    },
+    "outlook_search_emails": {
+      "enabled": true,
+      "description": "Cerca email con query di ricerca",
+      "endpoint": "/tools/invoke",
+      "method": "POST",
+      "parameters": {
+        "query": {
+          "type": "string",
+          "required": true,
+          "description": "Query di ricerca"
+        },
+        "max_results": {
+          "type": "integer",
+          "default": 10,
+          "min": 1,
+          "max": 50
+        }
+      },
+      "rate_limit": {
+        "requests_per_minute": 30,
+        "requests_per_hour": 200
+      }
+    }
+  },
+  "outlook_oauth": {
+    "client_id": "${OUTLOOK_CLIENT_ID}",
+    "client_secret": "${OUTLOOK_CLIENT_SECRET}",
+    "tenant_id": "${OUTLOOK_TENANT_ID}",
+    "scopes": [
+      "https://graph.microsoft.com/.default"
+    ],
+    "authority": "https://login.microsoftonline.com/${OUTLOOK_TENANT_ID}",
+    "token_url": "https://login.microsoftonline.com/${OUTLOOK_TENANT_ID}/oauth2/v2.0/token"
+  },
+  "security": {
+    "enable_https": true,
+    "cors": {
+      "enabled": true,
+      "allowed_origins": ["*"],
+      "allowed_methods": ["GET", "POST"],
+      "allowed_headers": ["*"]
+    },
+    "rate_limiting": {
+      "enabled": true,
+      "global_limit": "1000/hour"
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "json",
+    "destinations": ["console", "cloudwatch"]
+  }
+}

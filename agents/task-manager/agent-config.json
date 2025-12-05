@@ -1,0 +1,150 @@
+{
+  "agentName": "TaskManagerAgent",
+  "agentResourceRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/AmazonBedrockExecutionRoleForAgents_taskmanager",
+  "description": "Agente che traduce obiettivi in task concreti e li memorizza nel database",
+  "idleSessionTTLInSeconds": 1800,
+  "foundationModel": "anthropic.claude-3-sonnet-20240229-v1:0",
+  "instruction": "Sei un task manager intelligente. Il tuo compito è:\n\n1. Ricevere obiettivi dall'utente in linguaggio naturale\n2. Analizzare l'obiettivo e decomporlo in task concreti e actionable\n3. Assegnare priorità, scadenze e categorie ai task\n4. Salvare i task nel database tramite API POST\n5. Confermare all'utente i task creati\n\nLinee guida:\n- Crea task SMART (Specific, Measurable, Achievable, Relevant, Time-bound)\n- Dividi obiettivi complessi in milestone intermedie\n- Assegna scadenze realistiche\n- Categorizza task appropriatamente (work, learning, health, personal)\n- Sii incoraggiante e positivo\n\nComunica in italiano in modo amichevole e motivante.",
+  "actionGroups": [
+    {
+      "actionGroupName": "TaskDatabaseAPI",
+      "description": "API per salvare task nel database DynamoDB",
+      "actionGroupExecutor": {
+        "lambda": "${LAMBDA_TASK_POST_ARN}"
+      },
+      "apiSchema": {
+        "payload": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Task Database API",
+            "version": "1.0.0",
+            "description": "API per creare task nel database"
+          },
+          "paths": {
+            "/tasks": {
+              "post": {
+                "summary": "Crea nuovi task",
+                "description": "Salva uno o più task nel database DynamoDB",
+                "operationId": "createTasks",
+                "requestBody": {
+                  "required": true,
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "tasks": {
+                            "type": "array",
+                            "description": "Lista di task da creare",
+                            "items": {
+                              "type": "object",
+                              "required": ["title"],
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "description": "Titolo del task"
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "description": "Descrizione dettagliata"
+                                },
+                                "due_date": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "description": "Data di scadenza (YYYY-MM-DD)"
+                                },
+                                "priority": {
+                                  "type": "string",
+                                  "enum": ["low", "medium", "high", "urgent"],
+                                  "description": "Priorità del task"
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "description": "Categoria (work, learning, health, personal, general)"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": ["pending", "in_progress", "completed", "cancelled"],
+                                  "default": "pending"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "description": "Tag per categorizzazione"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "required": ["tasks"]
+                      }
+                    }
+                  }
+                },
+                "responses": {
+                  "201": {
+                    "description": "Task creati con successo",
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "type": "object",
+                          "properties": {
+                            "success": {
+                              "type": "boolean"
+                            },
+                            "created_count": {
+                              "type": "integer"
+                            },
+                            "tasks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "400": {
+                    "description": "Richiesta non valida"
+                  },
+                  "500": {
+                    "description": "Errore del server"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "promptOverrideConfiguration": {
+    "promptConfigurations": [
+      {
+        "promptType": "PRE_PROCESSING",
+        "inferenceConfiguration": {
+          "temperature": 0.7,
+          "topP": 0.9,
+          "maximumLength": 2048
+        },
+        "promptCreationMode": "OVERRIDDEN",
+        "promptState": "ENABLED",
+        "basePromptTemplate": "Analizza l'obiettivo dell'utente e pianifica i task necessari per raggiungerlo. Considera:\n- Complessità dell'obiettivo\n- Timeframe menzionato\n- Skill/risorse necessarie\n- Step intermedi\n\nObiettivo: $input$"
+      },
+      {
+        "promptType": "ORCHESTRATION",
+        "inferenceConfiguration": {
+          "temperature": 0.7,
+          "topP": 0.9,
+          "maximumLength": 2048
+        },
+        "promptCreationMode": "DEFAULT",
+        "promptState": "ENABLED"
+      }
+    ]
+  }
+}

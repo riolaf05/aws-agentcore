@@ -1,0 +1,75 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# AWS
+.aws-sam/
+samconfig.toml
+
+# CDK
+infrastructure/cdk-app/cdk.out/
+infrastructure/cdk-app/node_modules/
+infrastructure/cdk-app/*.js
+infrastructure/cdk-app/*.d.ts
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Secrets
+secrets.json
+credentials.json
+*.pem
+*.key
+
+# OS
+Thumbs.db
