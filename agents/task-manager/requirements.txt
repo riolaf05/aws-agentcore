@@ -1,4 +1,0 @@
-bedrock-agentcore
-strands-agents
-boto3
-httpx

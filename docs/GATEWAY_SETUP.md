@@ -49,7 +49,6 @@ Crea il Gateway con il CLI di AgentCore:
 ```bash
 agentcore gateway create-mcp-gateway \
     --name TaskAPIGateway \
-    --description "Gateway sicuro per Task API con POST e GET Lambda" \
     --region us-east-1
 ```
 

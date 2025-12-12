@@ -1,0 +1,14 @@
+# Ignora file con encoding problematici
+*.md.bak
+*.md
+*.pyc
+__pycache__/
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.git/
+.gitignore
+.venv/
+venv/

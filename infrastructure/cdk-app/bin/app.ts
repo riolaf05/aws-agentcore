@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { PersonalAssistantStack } from './lib/personal-assistant-stack';
+import { PersonalAssistantStack } from '../lib/personal-assistant-stack';
 import * as dotenv from 'dotenv';
 
 // Load environment variables

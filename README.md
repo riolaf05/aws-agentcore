@@ -184,7 +184,7 @@ pip install bedrock-agentcore-starter-toolkit strands-agents
 
 # Copia e configura .env
 copy .env.example .env
-# Modifica .env con i tuoi valori (AWS_ACCOUNT_ID, TELEGRAM_BOT_TOKEN, etc)
+# Compila .env seguendo la sezione "Configurazione .env" più sotto
 ```
 
 #### 2. Deploy Infrastruttura Base (CDK)
@@ -254,7 +254,6 @@ Il Gateway fornisce accesso sicuro e autenticato alle Lambda Task API tramite OA
 # Crea Gateway MCP
 agentcore gateway create-mcp-gateway `
     --name TaskAPIGateway `
-    --description "Gateway sicuro per Task API" `
     --region us-east-1
 
 # Output: gateway-id, gateway-url, cognito credentials
@@ -264,47 +263,53 @@ agentcore gateway create-mcp-gateway `
 Aggiungi Lambda targets per POST e GET:
 
 ```powershell
-# Target per save_task (POST)
+# Target per save-task (POST)
 agentcore gateway create-mcp-gateway-target `
     --gateway-arn <gateway-arn> `
     --gateway-url <gateway-url> `
     --role-arn <iam-role-arn> `
-    --name save_task `
+    --name save-task `
     --target-type lambda `
+    --region us-east-1 `
     --target-payload '{
-      "arn": "<TaskPostLambdaArn>",
-      "tools": [{
-        "name": "save_task",
-        "description": "Save tasks to database",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "tasks": {"type": "array"}
+      "lambdaArn": "<TaskPostLambdaArn>",
+      "toolSchema": {
+        "inlinePayload": [{
+          "name": "save-task",
+          "description": "Save tasks to database",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "tasks": {"type": "array"}
+            }
           }
-        }
-      }]
+        }]
+      }
     }'
 
-# Target per get_tasks (GET)
+# Target per get-tasks (GET)
 agentcore gateway create-mcp-gateway-target `
     --gateway-arn <gateway-arn> `
     --gateway-url <gateway-url> `
     --role-arn <iam-role-arn> `
-    --name get_tasks `
+    --name get-tasks `
     --target-type lambda `
+    --region us-east-1 `
     --target-payload '{
-      "arn": "<TaskGetLambdaArn>",
-      "tools": [{
-        "name": "get_tasks",
-        "description": "Retrieve tasks from database",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "due_date": {"type": "string"},
-            "status": {"type": "string"}
+      "lambdaArn": "<TaskGetLambdaArn>",
+      "toolSchema": {
+        "inlinePayload": [{
+          "name": "get-tasks",
+          "description": "Retrieve tasks from database",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "due_date": {"type": "string"},
+              "status": {"type": "string"}
+            }
           }
-        }
-      }]
+        }]
+      }
     }'
 ```
 
@@ -312,25 +317,66 @@ agentcore gateway create-mcp-gateway-target `
 
 #### 5. Configura Environment Variables
 
-Aggiorna `.env` con gli ARN degli agenti deployati e le credenziali Gateway:
+Aggiorna `.env` con gli ARN degli agenti deployati e le credenziali Gateway.
+
+**📋 Guida completa compilazione `.env`:**
 
 ```bash
-# ARN dagli step precedenti
-ORCHESTRATOR_AGENT_ARN=arn:aws:bedrock-agentcore:...
-TASK_MANAGER_AGENT_ARN=arn:aws:bedrock-agentcore:...
-DAILY_BRIEFING_AGENT_ARN=arn:aws:bedrock-agentcore:...
+# ============================================
+# 1. AWS Base (compila subito)
+# ============================================
+AWS_REGION=us-east-1
+AWS_ACCOUNT_ID=<il_tuo_account_id>  # es: 879338784410
 
-# Lambda ARN (da CDK output)
-LAMBDA_TASK_POST_ARN=arn:aws:lambda:...
-LAMBDA_TASK_GET_ARN=arn:aws:lambda:...
+# ============================================
+# 2. Telegram (compila subito)
+# ============================================
+TELEGRAM_BOT_TOKEN=<token_da_botfather>  # Ottieni da @BotFather su Telegram
+TELEGRAM_WEBHOOK_URL=<compila_dopo_cdk>  # Output CDK: TelegramWebhookUrl
+TELEGRAM_CHAT_ID=<tuo_chat_id>          # Ottieni mandando /start al bot
 
-# AgentCore Gateway Configuration (dallo step 4)
-GATEWAY_MCP_URL=https://bedrock-agentcore.us-east-1.amazonaws.com/gateways/gateway-xxx
-GATEWAY_CLIENT_ID=abcd1234efgh5678
-GATEWAY_CLIENT_SECRET=secret-key-here
-GATEWAY_TOKEN_ENDPOINT=https://task-api-gateway.auth.us-east-1.amazoncognito.com/oauth2/token
+# ============================================
+# 3. Lambda ARNs (compila dopo CDK deploy)
+# ============================================
+LAMBDA_TASK_POST_ARN=<compila_dopo_cdk>      # Output CDK: TaskPostLambdaArn
+LAMBDA_TASK_GET_ARN=<compila_dopo_cdk>       # Output CDK: TaskGetLambdaArn
+LAMBDA_ORCHESTRATOR_ARN=<compila_dopo_cdk>   # Output CDK: OrchestratorLambdaArn
+
+# ============================================
+# 4. MCP Server Esterno (opzionale - per Outlook)
+# ============================================
+MCP_SERVER_URL=https://your-mcp-server.com
+MCP_API_KEY=your-api-key
+MCP_SECRET_NAME=personal-assistant/mcp-api-key
+
+# ============================================
+# 5. Bedrock AgentCore ARNs (compila dopo deploy agenti)
+# ============================================
+# Ottieni con: agentcore list-agents-runtimes --region us-east-1
+ORCHESTRATOR_AGENT_ARN=<output_agentcore_launch>       # es: arn:aws:bedrock-agentcore:...:runtime/orchestrator_agent-xxx
+TASK_MANAGER_AGENT_ARN=<output_agentcore_launch>       # es: arn:aws:bedrock-agentcore:...:runtime/taskmanager_agent-xxx
+DAILY_BRIEFING_AGENT_ARN=<output_agentcore_launch>     # es: arn:aws:bedrock-agentcore:...:runtime/dailybriefing_agent-xxx
+
+# ============================================
+# 6. AgentCore Gateway (compila dopo step 4)
+# ============================================
+# Ottieni con: agentcore gateway get-mcp-gateway --name TaskAPIGateway --region us-east-1
+GATEWAY_MCP_URL=<gateway_url>                    # es: https://taskapigateway-xxx.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp
+GATEWAY_CLIENT_ID=<client_id_da_gateway>         # es: 40ipvfb7kr5hnjqm06555e5hlp
+GATEWAY_CLIENT_SECRET=<client_secret_da_gateway> # es: 6rtmm58udin800qd6eiufv8top19q615m57...
+GATEWAY_TOKEN_ENDPOINT=https://<gateway-id>.auth.us-east-1.amazoncognito.com/oauth2/token
 GATEWAY_SCOPE=invoke
 ```
+
+**🔍 Come ottenere ogni valore:**
+
+1. **AWS_ACCOUNT_ID**: `aws sts get-caller-identity --query Account --output text`
+2. **TELEGRAM_BOT_TOKEN**: Crea bot con @BotFather, copia token
+3. **TELEGRAM_CHAT_ID**: Manda `/start` al bot, poi `curl https://api.telegram.org/bot<TOKEN>/getUpdates`
+4. **Lambda ARNs**: `cdk outputs --json` dopo deploy stack
+5. **Agent ARNs**: Mostrati dopo `agentcore launch` o `agentcore list-agents-runtimes`
+6. **Gateway config**: `agentcore gateway get-mcp-gateway --name TaskAPIGateway --region us-east-1`
+   - `GATEWAY_TOKEN_ENDPOINT` si ricava da gateway-id: `https://<gateway-id>.auth.<region>.amazoncognito.com/oauth2/token`
 
 #### 6. Aggiorna Orchestrator con Sub-Agent ARN
 
@@ -345,6 +391,7 @@ cd agents/orchestrator
 # environmentVariables:
 #   TASK_MANAGER_AGENT_ARN: "arn:..."
 #   DAILY_BRIEFING_AGENT_ARN: "arn:..."
+#   MCP_SECRET_NAME: "personal-assistant/mcp-api-key"  # opzionale, per MCP esterno
 
 # Re-deploy con nuove variabili
 agentcore launch --auto-update-on-conflict
@@ -357,16 +404,16 @@ cd ../task-manager
 
 # Modifica .bedrock_agentcore.yaml e aggiungi:
 # environmentVariables:
-#   GATEWAY_MCP_URL: "https://..."
-#   GATEWAY_CLIENT_ID: "..."
-#   GATEWAY_CLIENT_SECRET: "..."
-#   GATEWAY_TOKEN_ENDPOINT: "https://..."
+#   GATEWAY_MCP_URL: "https://taskapigateway-xxx.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp"
+#   GATEWAY_CLIENT_ID: "40ipvfb7kr5hnjqm06555e5hlp"
+#   GATEWAY_CLIENT_SECRET: "6rtmm58udin800qd6eiufv8top19q615m57..."
+#   GATEWAY_TOKEN_ENDPOINT: "https://taskapigateway-xxx.auth.us-east-1.amazoncognito.com/oauth2/token"
 #   GATEWAY_SCOPE: "invoke"
 
 agentcore launch --auto-update-on-conflict
 
 cd ../daily-briefing
-# Ripeti lo stesso per daily-briefing
+# Ripeti lo stesso per daily-briefing con le stesse credenziali Gateway
 agentcore launch --auto-update-on-conflict
 ```
 
