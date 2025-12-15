@@ -41,8 +41,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     }
     """
     try:
-        # Parse request body
-        body = json.loads(event.get('body', '{}'))
+        # Parse request body - gestisce sia API Gateway che Gateway MCP
+        if 'body' in event and isinstance(event['body'], str):
+            # Chiamata da API Gateway (body è una stringa JSON)
+            body = json.loads(event['body'])
+        else:
+            # Chiamata diretta da Gateway MCP (parametri nell'evento)
+            body = event
+        
         tasks = body.get('tasks', [])
         
         if not tasks:

@@ -1,0 +1,18 @@
+# Dipendenze per TaskWriter Agent
+# Agent framework con supporto MCP
+strands-agents==1.19.0
+
+# Strumenti MCP per l'integrazione con il Gateway
+strands-agents-tools==0.2.17
+
+# SDK AWS Bedrock AgentCore
+bedrock-agentcore==1.1.1
+
+# SDK AWS per interazioni con servizi AWS (Cognito, DynamoDB)
+boto3>=1.42.7
+
+# Client HTTP per comunicazione con il Gateway MCP
+requests>=2.31.0
+
+# Supporto per protocollo MCP
+mcp>=1.0.0
