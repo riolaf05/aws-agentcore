@@ -6,12 +6,21 @@ Usa invoke_agent_runtime per delegare task specifici ad agenti dedicati.
 import logging
 import json
 import uuid
-from typing import Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 from bedrock_agentcore import BedrockAgentCoreApp
 from bedrock_agentcore.runtime.context import RequestContext
+from bedrock_agentcore.memory import MemoryClient
+
+from hooks.short_memory_hook import ShortMemoryHook
+from hooks.long_term_memory_hook import LongTermMemoryHook
+
 from strands import Agent, tool
 from strands.models import BedrockModel
 import boto3
+from hooks.memory import MemoryConfig, retrieve_memories_for_actor
+
+DEFAULT_ACTOR_ID = "my-user-id"
+DEFAULT_SESSION_ID = "DEFAULT"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +29,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = BedrockAgentCoreApp()
+
+# Inizializza la configurazione della memoria e il client
+memory_config = MemoryConfig()
+memory_client = MemoryClient()
 
 # Initialize Bedrock AgentCore client
 agent_core_client = boto3.client('bedrock-agentcore', region_name='us-east-1')
@@ -32,6 +45,26 @@ AGENTS = {
     "calculator": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/calculator-lgV0vpGtcq"
 }
 
+# Istanza agente verra creata in modo lazy quando necessario
+agent = None
+
+@tool
+def retrieve_memories(query: str) -> List[Dict[str, Any]]:
+    """Recupera i ricordi dal client della memoria usando una sintassi simile ad AWS CLI.
+    
+    Args:
+        query: La query di ricerca per trovare ricordi rilevanti.
+        
+    Returns:
+        Una lista di ricordi recuperati dal client della memoria.
+    """
+    actor_id = agent.state.get("actor_id")
+    return retrieve_memories_for_actor(
+        memory_id=memory_config.memory_id,
+        actor_id=actor_id,
+        search_query=query,
+        memory_client=memory_client
+    )
 
 @tool
 def invoke_agent(agent_name: str, prompt: str) -> str:
@@ -91,7 +124,13 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
                 content.append(chunk.decode('utf-8'))
             
             result_data = json.loads(''.join(content))
-            result = result_data.get('result', str(result_data))
+            
+            # Gestisci sia dict che str
+            if isinstance(result_data, dict):
+                result = result_data.get('result', str(result_data))
+            else:
+                result = str(result_data)
+            
             logger.debug(f"Risposta JSON da '{agent_name}': {result[:200]}...")
             return result
         
@@ -156,6 +195,11 @@ Sii proattivo e chiedi chiarimenti solo se strettamente necessario.
 @app.entrypoint
 def invoke(payload: Dict[str, Any], context: Optional[RequestContext] = None) -> Dict[str, Any]:
     """Punto di ingresso dell'orchestrator agent"""
+
+    global agent
+
+    actor_id = payload.get("actor_id", DEFAULT_ACTOR_ID)
+    session_id = context.session_id if context and context.session_id else payload.get("session_id", DEFAULT_SESSION_ID)
     
     logger.info("Orchestrator invocato")
     logger.debug(f"Payload: {json.dumps(payload, indent=2)}")
@@ -168,12 +212,18 @@ def invoke(payload: Dict[str, Any], context: Optional[RequestContext] = None) ->
     )
     
     # Crea agent con tool per invocare altri agenti
-    agent = Agent(
-        name="Orchestrator",
-        model=model,
-        system_prompt=SYSTEM_PROMPT,
-        tools=[invoke_agent]
-    )
+    if agent is None:
+        agent = Agent(
+            name="Orchestrator",
+            hooks=[
+                ShortMemoryHook(memory_id=memory_config.memory_id),
+                LongTermMemoryHook(memory_id=memory_config.memory_id)
+            ],
+            state={"actor_id": actor_id, "session_id": session_id},
+            model=model,
+            system_prompt=SYSTEM_PROMPT,
+            tools=[retrieve_memories, invoke_agent]
+        )
     
     user_message = payload.get("prompt", "Come posso aiutarti?")
     logger.info(f"Messaggio utente: {user_message}")
