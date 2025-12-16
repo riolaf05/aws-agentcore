@@ -14,6 +14,11 @@ CLIENT_SECRET = "6rtmm58udin800qd6eiufv8top19q615m57etqha4fn9opmbi3f"
 TOKEN_URL = "https://agentcore-85bb2461.auth.us-east-1.amazoncognito.com/oauth2/token"
 GATEWAY_URL = "https://taskapigateway-vveeifneus.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp"
 
+system_prompt = """
+    Sei un assistente AI utile.
+    Il tuo compito è utilizzare il tool dedicato per leggere uno o più task basati sul prompt dell'utente.
+    """
+
 def fetch_access_token(client_id, client_secret, token_url):
     response = requests.post(
         token_url,
@@ -31,6 +36,7 @@ def _invoke_agent(
         tools = mcp_client.list_tools_sync()
         agent = Agent(
             model=bedrock_model,
+            system_prompt=system_prompt,
             tools=tools
         )
         return agent(prompt)
