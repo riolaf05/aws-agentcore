@@ -237,3 +237,23 @@ aws dynamodb list-tables
 
 **Lambda timeout**
 → Aumenta timeout in CDK: `timeout: Duration.seconds(60)`, poi `cdk deploy`
+
+## 📚 Risorse e Riferimenti
+
+### Agent Base con Memoria (Strands + AgentCore)
+- [Building Production-Ready AI Agents with Strands Agents and Amazon Bedrock AgentCore](https://dev.to/aws/building-production-ready-ai-agents-with-strands-agents-and-amazon-bedrock-agentcore-3dg0)
+- [AgentCore Multi-Framework Examples - Strands Agents](https://github.com/danilop/agentcore-multi-framework-examples/tree/main/agentcore-strands-agents)
+
+### MCP con Lambda
+- [Building Production-Ready MCP Workflows with Amazon Bedrock AgentCore Gateway](https://medium.com/@wael-saideni/building-production-ready-mcp-workflows-with-amazon-bedrock-agentcore-gateway-d8386db65df3)
+- [Amazon Bedrock AgentCore Gateway Part 3: Exposing AWS Lambda via MCP](https://dev.to/aws-heroes/amazon-bedrock-agentcore-gateway-part-3-exposing-existing-aws-lambda-function-via-mcp-and-gateway-2ga)
+
+### Web Search Tool
+- [AgentCore Memory Tutorial - Personal Agent with Web Search](https://github.com/awslabs/amazon-bedrock-agentcore-samples/blob/main/01-tutorials/04-AgentCore-memory/01-short-term-memory/01-single-agent/with-strands-agent/personal-agent.ipynb)
+
+### Comunicazione Multi-Agent
+- [Building a Proactive AI Travel Agent on AWS Bedrock AgentCore](https://dev.to/aws-builders/building-a-proactive-ai-travel-agent-on-aws-bedrock-agentcore-final-part--p5n)
+- [Bedrock Travel Agent - Orchestrator Implementation](https://github.com/hvmathan/bedrock-travel-agent/blob/main/orchestrator.py)
+
+### Documentazione Ufficiale
+- [AWS Bedrock AgentCore - Memory Organization](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory-organization.html)
