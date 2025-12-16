@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orchestrator Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🤖 Orchestrator AI</h1>
+            <div class="status">
+                <span id="status-indicator" class="status-dot disconnected"></span>
+                <span id="status-text">Disconnesso</span>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="system-message">
+                Benvenuto! Sono l'Orchestrator AI. Posso aiutarti a:
+                <ul>
+                    <li>📝 Creare e gestire task</li>
+                    <li>🔍 Cercare informazioni online</li>
+                    <li>🧮 Eseguire calcoli matematici</li>
+                </ul>
+                Scrivi un messaggio per iniziare!
+            </div>
+        </div>
+
+        <div class="chat-input-container">
+            <input 
+                type="text" 
+                id="messageInput" 
+                placeholder="Scrivi un messaggio..."
+                autocomplete="off"
+            >
+            <button id="sendButton">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="chat-info">
+            <small>Session ID: <span id="sessionId"></span></small>
+            <button id="newSessionButton" class="new-session-btn">Nuova Sessione</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
