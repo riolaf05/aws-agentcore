@@ -3,7 +3,11 @@ from strands.models import BedrockModel
 from strands.tools.mcp.mcp_client import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
 import requests
-import sys
+from bedrock_agentcore import BedrockAgentCoreApp
+from strands import Agent
+
+app = BedrockAgentCoreApp()
+agent = Agent()
 
 CLIENT_ID = "40ipvfb7kr5hnjqm06555e5hlp"
 CLIENT_SECRET = "6rtmm58udin800qd6eiufv8top19q615m57etqha4fn9opmbi3f"
@@ -44,27 +48,22 @@ def _create_streamable_http_transport(headers=None):
 def _get_bedrock_model(model_id):
     return BedrockModel(
         model_id=model_id,
-        temperature=0.0,
+        temperature=0.7,   
         streaming=True,
     )
 
-def main():
-    """Entry point for the agent."""
+@app.entrypoint
+def invoke(payload):
+    """Your AI agent function"""
     mcp_client = MCPClient(_create_streamable_http_transport)
-    
-    # Get prompt from command line arguments or use default
-    if len(sys.argv) > 1:
-        user_prompt = " ".join(sys.argv[1:])
-    else:
-        user_prompt = "Aggiungi un task per 'Comprare il latte' con scadenza domani alle 18:00 e priorità alta."
-    
+
+    user_message = payload.get("prompt", "Hello! How can I help you today?")
     response = _invoke_agent(
         bedrock_model=_get_bedrock_model("us.anthropic.claude-sonnet-4-20250514-v1:0"),
         mcp_client=mcp_client,
-        prompt=user_prompt
+        prompt=user_message
     )
-    print(response)
     return response
 
 if __name__ == "__main__":
-    main()
+    app.run()

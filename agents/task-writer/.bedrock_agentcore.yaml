@@ -30,7 +30,7 @@ agents:
     bedrock_agentcore:
       agent_id: taskwriter-v5ts2W9Ghp
       agent_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/taskwriter-v5ts2W9Ghp
-      agent_session_id: c055ce12-aa6f-460d-8a08-f6dc8d008cb2
+      agent_session_id: 79706171-7c76-452f-a547-43e37cf965f7
     codebuild:
       project_name: bedrock-agentcore-taskwriter-builder
       execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-d90c7cae3b

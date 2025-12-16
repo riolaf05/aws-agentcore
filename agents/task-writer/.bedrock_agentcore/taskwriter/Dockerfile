@@ -16,9 +16,6 @@ COPY requirements.txt requirements.txt
 # Install from requirements file
 RUN uv pip install -r requirements.txt
 
-
-
-
 RUN uv pip install aws-opentelemetry-distro==0.12.2
 
 
