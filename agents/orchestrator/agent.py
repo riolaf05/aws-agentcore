@@ -39,10 +39,9 @@ agent_core_client = boto3.client('bedrock-agentcore', region_name='us-east-1')
 
 # ARN degli agenti disponibili
 AGENTS = {
-    "task-writer": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/taskwriter-v5ts2W9Ghp",
-    "task-reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/task_reader-aEBvIeHdvC",  
     "researcher": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/researcher-hGVInWG4SS",   
-    "calculator": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/calculator-lgV0vpGtcq"
+    "calculator": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/calculator-lgV0vpGtcq",
+    "project_goal_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt"
 }
 
 # Istanza agente verra creata in modo lazy quando necessario
@@ -71,7 +70,7 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
     """Invoca un agente specializzato con un prompt specifico.
     
     Args:
-        agent_name: Nome dell'agente da invocare. Valori: task-writer, task-reader, researcher, calculator
+        agent_name: Nome dell'agente da invocare. Valori: task-writer, task-reader, researcher, calculator, project-goal-writer-reader
         prompt: Il prompt da inviare all'agente
         
     Returns:
@@ -154,17 +153,18 @@ I tuoi compiti sono:
 5. Aggregare i risultati e fornire una risposta coerente
 
 Agenti disponibili:
-- **task-writer**: Crea e salva nuovi task nel database DynamoDB
-  ARN: {task_writer_arn}
-  
-- **task-reader**: Legge e recupera task esistenti dal database
-  ARN: {task_reader_arn}
   
 - **researcher**: Cerca informazioni aggiornate su internet (regione: Italia)
   ARN: {researcher_arn}
   
 - **calculator**: Esegue calcoli matematici e mantiene memoria delle operazioni
   ARN: {calculator_arn}
+
+- **project_goal_writer_reader**: Gestisce progetti e obiettivi strategici (CRUD completo)
+  ARN: {project_goal_arn}
+  Usa questo agente per:
+  - Creare, leggere, aggiornare progetti software
+  - Creare, leggere, aggiornare o eliminare obiettivi strategici
 
 Processo di lavoro:
 1. Quando ricevi una richiesta, prima PENSA e crea un piano passo-passo
@@ -181,14 +181,16 @@ Esempi di routing:
 - "Mostrami i task con alta priorità" → invoke_agent("task-reader", "...")
 - "Cerca informazioni sulla sicurezza in Python" → invoke_agent("researcher", "...")
 - "Quanto fa 15 * 23?" → invoke_agent("calculator", "...")
+- "Crea un progetto per sistema di raccomandazione AI" → invoke_agent("project-goal-writer-reader", "...")
+- "Mostrami gli obiettivi per Reply" → invoke_agent("project-goal-writer-reader", "...")
+- "Crea un obiettivo per aumentare il fatturato Q1" → invoke_agent("project-goal-writer-reader", "...")
 - "Crea un task per studiare i risultati della ricerca su AI" → invoke_agent("researcher", "...") THEN invoke_agent("task-writer", "...")
 
 Sii proattivo e chiedi chiarimenti solo se strettamente necessario.
 """.format(
-    task_writer_arn=AGENTS["task-writer"],
-    task_reader_arn=AGENTS["task-reader"],
     researcher_arn=AGENTS["researcher"],
-    calculator_arn=AGENTS["calculator"]
+    calculator_arn=AGENTS["calculator"],
+    project_goal_arn=AGENTS["project_goal_writer_reader"]
 )
 
 

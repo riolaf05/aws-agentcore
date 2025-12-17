@@ -30,13 +30,34 @@ Una suite di agenti AI intelligenti per l'organizzazione personale, costruita co
 - Notifiche push
 - Supporto Markdown
 
+### 🌐 Frontend Web Interattivo
+
+- **Dashboard completa** con chat, obiettivi e progetti
+- **CRUD completo**: Crea, modifica ed elimina obiettivi e progetti
+- **Editing modale**: Popup per modifica rapida con validazione
+- **Formattazione avanzata**: 
+  - Supporto grassetto (`**testo**`) nelle descrizioni
+  - A capo automatici per testo formattato
+- **Sottotask espandibili**: Freccina toggle per mostrare/nascondere i sottotask
+- **Filtri intelligenti**: Per ambito, status, priorità e tag
+- **Architettura sicura**: Backend Flask proxy, nessun endpoint pubblico REST
+
 ### 🔌 Integrazioni
 
 - **AgentCore Gateway**: Secure Lambda access with OAuth2 + MCP protocol
-- **DynamoDB**: Persistence layer per task
+- **DynamoDB**: Persistence layer con 3 tabelle (Goals, Projects, Tasks)
+- **Lambda Functions**: 10 funzioni per CRUD completo (POST/GET/UPDATE/DELETE)
 - **MCP Server**: Model Context Protocol per Outlook
 - **Microsoft Graph**: Email e calendar access
 - **EventBridge**: Scheduled daily briefings (8:00 AM)
+- **Flask Backend**: Proxy locale per invocazione Lambda con IAM auth
+
+### 🔐 Architettura Sicura
+
+- **No API Gateway pubblico**: Rimosso per eliminare superfici d'attacco
+- **IAM-only Lambda access**: Invocazione diretta tramite boto3 con credenziali AWS
+- **Backend Flask proxy**: Porta 5000 locale, non esposta a internet
+- **Telegram webhook**: Unico endpoint pubblico (necessario per il bot)
 
 ### 💰 Architettura Pay-Per-Use
 
@@ -56,32 +77,34 @@ Una suite di agenti AI intelligenti per l'organizzazione personale, costruita co
 └──────┬──────┘
        │
        v
-┌──────────────────┐      ┌───────────────┐
-│  API Gateway     │─────>│  Orchestrator │
-│  (Webhook)       │      │     Agent     │
-└──────────────────┘      └───────┬───────┘
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │                           │
-                    v                           v
-          ┌──────────────────┐      ┌──────────────────┐
-          │  Task Manager    │      │ Daily Briefing   │
-          │     Agent        │      │     Agent        │
-          └────────┬─────────┘      └────────┬─────────┘
-                   │                         │
-                   │  ┌──────────────────┐   │
-                   └─>│  AgentCore       │<──┘
-                      │    Gateway       │
-                      │  (OAuth2 + MCP)  │
-                      └────────┬─────────┘
-                               │
-                ┌──────────────┴──────────────┐
-                │                             │
-                v                             v
-          ┌────────────────┐       ┌────────────────┐
-          │ Lambda Task API│       │  MCP Server    │
-          │  (DynamoDB)    │       │   (Outlook)    │
-          └────────────────┘       └────────────────┘
+┌──────────────────┐      ┌───────────────┐      ┌──────────────────┐
+│  API Gateway     │─────>│  Orchestrator │      │  Flask Frontend  │
+│  (Webhook)       │      │     Agent     │      │   (localhost)    │
+└──────────────────┘      └───────┬───────┘      └────────┬─────────┘
+                                  │                       │
+                    ┌─────────────┴─────────────┐         │
+                    │                           │         │
+                    v                           v         v
+          ┌──────────────────┐      ┌──────────────────┐ │
+          │  Task Manager    │      │ Daily Briefing   │ │
+          │     Agent        │      │     Agent        │ │
+          └────────┬─────────┘      └────────┬─────────┘ │
+                   │                         │           │
+                   │  ┌──────────────────┐   │           │
+                   └─>│  AgentCore       │<──┘           │
+                      │    Gateway       │               │
+                      │  (OAuth2 + MCP)  │               │
+                      └────────┬─────────┘               │
+                               │                         │
+                ┌──────────────┴──────────────┐          │
+                │                             │          │
+                v                             v          v
+    ┌────────────────────┐       ┌────────────────┐  ┌──────────────────┐
+    │ Lambda CRUD APIs   │       │  MCP Server    │  │  Lambda CRUD     │
+    │ - Goals (4)        │       │   (Outlook)    │  │  - Projects (4)  │
+    │ - Tasks (2)        │       │                │  │  - IAM Auth Only │
+    │ (DynamoDB)         │       └────────────────┘  └──────────────────┘
+    └────────────────────┘
 ```
 
 **Framework Stack**:
@@ -113,6 +136,18 @@ asws-agentcore/
 │       └── Dockerfile
 │
 ├── lambdas/                         # Support Lambda Functions
+│   ├── goal-api/
+│   │   ├── post_goal.py           # POST - Create goals
+│   │   ├── get_goal.py            # GET - Query goals
+│   │   ├── update_goal.py         # UPDATE - Modify goals
+│   │   ├── delete_goal.py         # DELETE - Remove goals
+│   │   └── requirements.txt
+│   ├── project-api/
+│   │   ├── post_project.py        # POST - Create projects
+│   │   ├── get_project.py         # GET - Query projects
+│   │   ├── update_project.py      # UPDATE - Modify projects
+│   │   ├── delete_project.py      # DELETE - Remove projects
+│   │   └── requirements.txt
 │   ├── task-api/
 │   │   ├── post_task.py           # POST /tasks - Create tasks
 │   │   ├── get_task.py            # GET /tasks - Query tasks
@@ -120,6 +155,14 @@ asws-agentcore/
 │   └── telegram-webhook/
 │       ├── bot.py                  # Telegram bot handler
 │       └── requirements.txt
+│
+├── chat-frontend/                   # Web Frontend
+│   ├── backend.py                  # Flask proxy server
+│   ├── index.html                  # Main UI with modals
+│   ├── app.js                      # Frontend logic (CRUD, formatting)
+│   ├── style.css                   # Main styles
+│   ├── modal-styles.css            # Modal & animation styles
+│   └── requirements.txt
 │
 ├── mcp-server/                      # Model Context Protocol Server
 │   ├── server.py                   # FastAPI MCP server
@@ -449,6 +492,48 @@ agentcore invoke '{"prompt": "Dammi il briefing"}' -a daily-briefing
 # Invia un messaggio al tuo bot
 ```
 
+#### 9. Avvia il Frontend Web (Opzionale)
+
+Il frontend web fornisce un'interfaccia completa per gestire obiettivi e progetti.
+
+```powershell
+cd chat-frontend
+
+# Crea virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# Installa dipendenze
+pip install -r requirements.txt
+
+# Configura Lambda ARNs in backend.py
+# Aggiorna le costanti con gli ARN ottenuti da CDK deploy:
+# - GOAL_POST_LAMBDA_ARN
+# - GOAL_GET_LAMBDA_ARN
+# - GOAL_UPDATE_LAMBDA_ARN
+# - GOAL_DELETE_LAMBDA_ARN
+# - PROJECT_POST_LAMBDA_ARN
+# - PROJECT_GET_LAMBDA_ARN
+# - PROJECT_UPDATE_LAMBDA_ARN
+# - PROJECT_DELETE_LAMBDA_ARN
+# - ORCHESTRATOR_LAMBDA_ARN
+
+# Avvia il backend Flask
+python backend.py
+```
+
+Apri il browser su `http://localhost:5000` e utilizza l'interfaccia web per:
+- **Chat**: Interagisci con l'orchestrator
+- **Obiettivi**: CRUD completo con filtri per ambito, status, priorità
+- **Progetti**: CRUD completo con GitHub URL e tech stack
+
+**Features del Frontend:**
+- ✏️ **Editing modale**: Click su "Modifica" per aprire popup di editing
+- **Formattazione**: Usa `**testo**` per grassetto nelle descrizioni
+- ▶️ **Sottotask espandibili**: Click sulla freccina per mostrare/nascondere
+- 🔄 **Refresh automatico**: Dopo ogni operazione CRUD
+- 🎨 **UI moderna**: Design gradient con animazioni fluide
+
 ---
 
 ## 📖 Usage
@@ -643,12 +728,15 @@ aws lambda invoke --function-name <TaskGetLambdaArn> \
 
 ## 💡 Roadmap
 
+- [x] CRUD completo per Goals e Projects con frontend web
+- [x] Formattazione avanzata con grassetto e a capo
+- [x] Sottotask espandibili con UI toggle
+- [x] Architettura sicura senza API Gateway pubblico
 - [ ] Multi-utente con autenticazione
-- [ ] Dashboard web con React
+- [ ] Dashboard analytics con grafici
 - [ ] Integrazione Google Calendar via MCP
 - [ ] Agente per meeting notes
 - [ ] Voice interface con Whisper
-- [ ] Analytics e insights
 - [ ] Mobile app (React Native)
 
 ---
