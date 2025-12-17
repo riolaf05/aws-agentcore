@@ -487,6 +487,12 @@ async function loadProjects() {
 }
 
 function displayProjects(projects) {
+    // Aggiorna counter
+    const counter = document.getElementById('projectsCounter');
+    if (counter) {
+        counter.textContent = projects.length;
+    }
+    
     if (projects.length === 0) {
         projectsList.innerHTML = `
             <div class="empty-state">
