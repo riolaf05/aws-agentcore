@@ -41,7 +41,8 @@ agent_core_client = boto3.client('bedrock-agentcore', region_name='us-east-1')
 AGENTS = {
     "researcher": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/researcher-hGVInWG4SS",   
     "calculator": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/calculator-lgV0vpGtcq",
-    "project_goal_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt"
+    "project_goal_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt",
+    "contact_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/contact_writer_reader-6T9ddn3sFx"
 }
 
 # Istanza agente verra creata in modo lazy quando necessario
@@ -70,7 +71,7 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
     """Invoca un agente specializzato con un prompt specifico.
     
     Args:
-        agent_name: Nome dell'agente da invocare. Valori: task-writer, task-reader, researcher, calculator, project-goal-writer-reader
+        agent_name: Nome dell'agente da invocare. Valori: researcher, calculator, project-goal-writer-reader, contact-writer-reader
         prompt: Il prompt da inviare all'agente
         
     Returns:
@@ -166,6 +167,12 @@ Agenti disponibili:
   - Creare, leggere, aggiornare progetti software
   - Creare, leggere, aggiornare o eliminare obiettivi strategici
 
+- **contact_writer_reader**: Gestisce contatti personali e professionali (CRUD completo)
+  ARN: {contact_arn}
+  Usa questo agente per:
+  - Creare, leggere, aggiornare o eliminare contatti
+  - Gestire informazioni come nome, cognome, email, telefono, descrizione, dove_conosciuto, note, url
+
 Processo di lavoro:
 1. Quando ricevi una richiesta, prima PENSA e crea un piano passo-passo
 2. Per ogni passo, identifica l'agente più adatto
@@ -184,13 +191,16 @@ Esempi di routing:
 - "Crea un progetto per sistema di raccomandazione AI" → invoke_agent("project-goal-writer-reader", "...")
 - "Mostrami gli obiettivi per Reply" → invoke_agent("project-goal-writer-reader", "...")
 - "Crea un obiettivo per aumentare il fatturato Q1" → invoke_agent("project-goal-writer-reader", "...")
+- "Aggiungi un contatto per Mario Rossi" → invoke_agent("contact-writer-reader", "...")
+- "Mostrami i contatti conosciuti a Roma" → invoke_agent("contact-writer-reader", "...")
 - "Crea un task per studiare i risultati della ricerca su AI" → invoke_agent("researcher", "...") THEN invoke_agent("task-writer", "...")
 
 Sii proattivo e chiedi chiarimenti solo se strettamente necessario.
 """.format(
     researcher_arn=AGENTS["researcher"],
     calculator_arn=AGENTS["calculator"],
-    project_goal_arn=AGENTS["project_goal_writer_reader"]
+    project_goal_arn=AGENTS["project_goal_writer_reader"],
+    contact_arn=AGENTS["contact_writer_reader"]
 )
 
 

@@ -1,0 +1,24 @@
+{
+  "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactUpdate",
+  "toolSchema": {
+    "inlinePayload": [{
+      "name": "update-contact",
+      "description": "Aggiorna un contatto esistente. Solo i campi forniti vengono modificati.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {"type": "string", "description": "ID del contatto da aggiornare (obbligatorio)"},
+          "nome": {"type": "string", "description": "Nuovo nome"},
+          "cognome": {"type": "string", "description": "Nuovo cognome"},
+          "email": {"type": "string", "description": "Nuova email"},
+          "telefono": {"type": "string", "description": "Nuovo telefono"},
+          "descrizione": {"type": "string", "description": "Nuova descrizione"},
+          "dove_conosciuto": {"type": "string", "description": "Aggiorna dove conosciuto"},
+          "note": {"type": "string", "description": "Nuove note"},
+          "url": {"type": "string", "description": "Nuovo URL"}
+        },
+        "required": ["contact_id"]
+      }
+    }]
+  }
+}

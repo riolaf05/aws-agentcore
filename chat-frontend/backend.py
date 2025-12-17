@@ -32,6 +32,10 @@ PROJECT_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:Person
 PROJECT_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectGet"
 PROJECT_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectDelete"
 PROJECT_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectUpdate"
+CONTACT_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactPost"
+CONTACT_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactGet"
+CONTACT_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactDelete"
+CONTACT_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactUpdate"
 
 # Client AWS
 bedrock_client = boto3.client('bedrock-agentcore', region_name=REGION)
@@ -501,6 +505,182 @@ def update_project():
         return jsonify({"error": f"Errore: {str(e)}"}), 500
 
 
+# ========================================
+# CONTACTS API (Proxy to Lambda)
+# ========================================
+
+@app.route('/api/contacts', methods=['GET'])
+def get_contacts():
+    """Recupera contatti con filtri opzionali"""
+    try:
+        # Ottieni parametri query
+        nome = request.args.get('nome', '')
+        cognome = request.args.get('cognome', '')
+        email = request.args.get('email', '')
+        dove_conosciuto = request.args.get('dove_conosciuto', '')
+        contact_id = request.args.get('contact_id', '')
+        limit = request.args.get('limit', '100')
+        
+        # Costruisci payload
+        payload = {}
+        if nome:
+            payload['nome'] = nome
+        if cognome:
+            payload['cognome'] = cognome
+        if email:
+            payload['email'] = email
+        if dove_conosciuto:
+            payload['dove_conosciuto'] = dove_conosciuto
+        if contact_id:
+            payload['contact_id'] = contact_id
+        if limit:
+            payload['limit'] = int(limit)
+        
+        logger.info(f"📖 Getting contacts with filters: {payload}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=CONTACT_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(payload)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Lambda returned {len(body.get('contacts', []))} contacts")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Lambda returned {len(result.get('contacts', []))} contacts")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting contacts: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/contacts', methods=['POST'])
+def create_contact():
+    """Crea un nuovo contatto"""
+    try:
+        data = request.get_json()
+        logger.info(f"➕ Creating contact: {data.get('nome', '')} {data.get('cognome', '')}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=CONTACT_POST_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Contact created: {body.get('contact_id', 'unknown')}")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Contact created: {result.get('contact_id', 'unknown')}")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating contact: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/contacts', methods=['DELETE'])
+def delete_contact():
+    """Elimina un contatto"""
+    try:
+        data = request.get_json()
+        contact_id = data.get('contact_id')
+        
+        if not contact_id:
+            return jsonify({"error": "contact_id è obbligatorio"}), 400
+        
+        logger.info(f"🗑️ Deleting contact: {contact_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=CONTACT_DELETE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Contact deleted successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Contact deleted successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting contact: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/contacts', methods=['PUT'])
+def update_contact():
+    """Aggiorna un contatto esistente"""
+    try:
+        data = request.get_json()
+        contact_id = data.get('contact_id')
+        
+        if not contact_id:
+            return jsonify({"error": "contact_id è obbligatorio"}), 400
+        
+        logger.info(f"✏️ Updating contact: {contact_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=CONTACT_UPDATE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Contact updated successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Contact updated successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating contact: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("🚀 Personal Assistant Backend Server")
@@ -519,6 +699,10 @@ if __name__ == '__main__':
     print("  POST /api/projects    - Crea progetto")
     print("  PUT  /api/projects    - Aggiorna progetto")
     print("  DELETE /api/projects  - Cancella progetto")
+    print("  GET  /api/contacts    - Recupera contatti")
+    print("  POST /api/contacts    - Crea contatto")
+    print("  PUT  /api/contacts    - Aggiorna contatto")
+    print("  DELETE /api/contacts  - Cancella contatto")
     print("=" * 60)
     
     app.run(host='0.0.0.0', port=5000, debug=True)

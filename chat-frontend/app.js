@@ -44,6 +44,17 @@ const refreshProjectsBtn = document.getElementById('refreshProjectsBtn');
 const projectFilterAmbito = document.getElementById('projectFilterAmbito');
 const projectFilterTag = document.getElementById('projectFilterTag');
 
+// Elementi DOM - Contacts
+const newContactBtn = document.getElementById('newContactBtn');
+const contactForm = document.getElementById('contactForm');
+const createContactForm = document.getElementById('createContactForm');
+const cancelContactBtn = document.getElementById('cancelContactBtn');
+const contactsList = document.getElementById('contactsList');
+const refreshContactsBtn = document.getElementById('refreshContactsBtn');
+const contactFilterNome = document.getElementById('contactFilterNome');
+const contactFilterCognome = document.getElementById('contactFilterCognome');
+const contactFilterDove = document.getElementById('contactFilterDove');
+
 // Inizializzazione
 function init() {
     // Chat setup
@@ -92,6 +103,27 @@ function init() {
     projectFilterAmbito.addEventListener('input', loadProjects);
     projectFilterTag.addEventListener('input', loadProjects);
     
+    // Contacts event listeners
+    newContactBtn.addEventListener('click', () => contactForm.style.display = 'block');
+    cancelContactBtn.addEventListener('click', () => {
+        contactForm.style.display = 'none';
+        createContactForm.reset();
+    });
+    createContactForm.addEventListener('submit', handleCreateContact);
+    refreshContactsBtn.addEventListener('click', loadContacts);
+    contactFilterNome.addEventListener('input', loadContacts);
+    contactFilterCognome.addEventListener('input', loadContacts);
+    contactFilterDove.addEventListener('input', loadContacts);
+    
+    // Contact sort listener
+    const contactSortOrder = document.getElementById('contactSortOrder');
+    if (contactSortOrder) {
+        contactSortOrder.addEventListener('change', (e) => {
+            currentContactSort = e.target.value;
+            loadContacts();
+        });
+    }
+    
     // Focus sull'input
     messageInput.focus();
 }
@@ -118,11 +150,13 @@ function switchView(viewName) {
     
     currentView = viewName;
     
-    // Load data when switching to goals/projects
+    // Load data when switching to goals/projects/contacts
     if (viewName === 'goals') {
         loadGoals();
     } else if (viewName === 'projects') {
         loadProjects();
+    } else if (viewName === 'contacts') {
+        loadContacts();
     }
 }
 
@@ -894,6 +928,319 @@ async function handleUpdateProject(e) {
         console.error('Error updating project:', error);
         alert(`Errore: ${error.message}`);
     }
+}
+
+// ========================================
+// CONTACTS MANAGEMENT
+// ========================================
+
+async function loadContacts() {
+    const contactsList = document.getElementById('contactsList');
+    if (!contactsList) return;
+    
+    contactsList.innerHTML = '<p class="loading">Caricamento contatti...</p>';
+    
+    try {
+        // Recupera filtri
+        const nomeFilter = document.getElementById('contactFilterNome')?.value || '';
+        const cognomeFilter = document.getElementById('contactFilterCognome')?.value || '';
+        const doveFilter = document.getElementById('contactFilterDove')?.value || '';
+        
+        const params = new URLSearchParams();
+        if (nomeFilter) params.append('nome', nomeFilter);
+        if (cognomeFilter) params.append('cognome', cognomeFilter);
+        if (doveFilter) params.append('dove_conosciuto', doveFilter);
+        
+        const url = `${CONFIG.API_URL}/contacts${params.toString() ? '?' + params.toString() : ''}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        displayContacts(data.contacts || []);
+        
+    } catch (error) {
+        console.error('Error loading contacts:', error);
+        contactsList.innerHTML = `<p class="error-message">Errore caricamento contatti: ${error.message}</p>`;
+    }
+}
+
+let currentContactSort = 'date-desc';
+
+function displayContacts(contacts) {
+    const contactsList = document.getElementById('contactsList');
+    
+    // Aggiorna counter
+    const counter = document.getElementById('contactsCounter');
+    if (counter) {
+        counter.textContent = contacts.length;
+    }
+    
+    if (contacts.length === 0) {
+        contactsList.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">👤</div>
+                <p class="empty-state-text">Nessun contatto trovato</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Applica ordinamento
+    const sortedContacts = sortContacts([...contacts], currentContactSort);
+    
+    contactsList.innerHTML = sortedContacts.map(contact => {
+        const displayName = escapeHtml([contact.nome, contact.cognome].filter(Boolean).join(' ') || 'Senza nome');
+        
+        return `
+        <div class="item-card">
+            <div class="item-header" style="cursor: pointer;" onclick="toggleContactDetails('${contact.contact_id}')">
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="expand-icon" id="expand-${contact.contact_id}">▶</span>
+                        <h3 class="item-title" style="margin: 0;">${displayName}</h3>
+                    </div>
+                    <div style="margin-left: 24px; margin-top: 4px;">
+                        ${contact.email ? `<a href="mailto:${escapeHtml(contact.email)}" class="item-link" onclick="event.stopPropagation();"><strong>${escapeHtml(contact.email)}</strong></a>` : ''}
+                        ${contact.email && contact.telefono ? ' • ' : ''}
+                        ${contact.telefono ? `<a href="tel:${escapeHtml(contact.telefono)}" class="item-link" onclick="event.stopPropagation();"><strong>${escapeHtml(contact.telefono)}</strong></a>` : ''}
+                    </div>
+                </div>
+                ${contact.dove_conosciuto ? `<span class="badge badge-ambito">${escapeHtml(contact.dove_conosciuto)}</span>` : ''}
+            </div>
+            
+            <div class="contact-details" id="details-${contact.contact_id}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;">
+                ${contact.descrizione ? `<div class="item-description" style="margin-top: 12px;">${formatDescription(contact.descrizione)}</div>` : ''}
+                
+                <div class="item-details" style="margin-top: 12px;">
+                    ${contact.url ? `
+                    <div class="item-detail">
+                        <span class="item-detail-label">URL</span>
+                        <a href="${escapeHtml(contact.url)}" target="_blank" class="item-link"><strong>${escapeHtml(contact.url)}</strong></a>
+                    </div>
+                    ` : ''}
+                    <div class="item-detail">
+                        <span class="item-detail-label">Creato</span>
+                        <span class="item-detail-value">${formatDateTime(contact.created_at)}</span>
+                    </div>
+                    ${contact.updated_at && contact.updated_at !== contact.created_at ? `
+                    <div class="item-detail">
+                        <span class="item-detail-label">Aggiornato</span>
+                        <span class="item-detail-value">${formatDateTime(contact.updated_at)}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                ${contact.note ? `
+                <div class="item-details" style="margin-top: 12px;">
+                    <div class="item-detail" style="grid-column: 1/-1;">
+                        <span class="item-detail-label">Note</span>
+                        <div class="item-description">${formatDescription(contact.note)}</div>
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div class="item-actions" style="margin-top: 12px;">
+                    <button class="btn-edit" onclick="event.stopPropagation(); editContact('${contact.contact_id}')">✏️ Modifica</button>
+                    <button class="btn-delete" onclick="event.stopPropagation(); deleteContact('${contact.contact_id}', '${displayName.replace(/'/g, "\\'")}')">🗑️ Elimina</button>
+                </div>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+function sortContacts(contacts, sortOrder) {
+    switch(sortOrder) {
+        case 'date-desc':
+            return contacts.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+        case 'date-asc':
+            return contacts.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+        case 'name-asc':
+            return contacts.sort((a, b) => {
+                const nameA = [a.cognome, a.nome].filter(Boolean).join(' ').toLowerCase();
+                const nameB = [b.cognome, b.nome].filter(Boolean).join(' ').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+        case 'name-desc':
+            return contacts.sort((a, b) => {
+                const nameA = [a.cognome, a.nome].filter(Boolean).join(' ').toLowerCase();
+                const nameB = [b.cognome, b.nome].filter(Boolean).join(' ').toLowerCase();
+                return nameB.localeCompare(nameA);
+            });
+        default:
+            return contacts;
+    }
+}
+
+function toggleContactDetails(contactId) {
+    const detailsDiv = document.getElementById(`details-${contactId}`);
+    const expandIcon = document.getElementById(`expand-${contactId}`);
+    
+    if (detailsDiv.style.maxHeight === '0px' || !detailsDiv.style.maxHeight) {
+        detailsDiv.style.maxHeight = detailsDiv.scrollHeight + 'px';
+        expandIcon.textContent = '▼';
+    } else {
+        detailsDiv.style.maxHeight = '0';
+        expandIcon.textContent = '▶';
+    }
+}
+
+async function handleCreateContact(e) {
+    e.preventDefault();
+    
+    const contactData = {
+        nome: document.getElementById('contactNome').value.trim(),
+        cognome: document.getElementById('contactCognome').value.trim(),
+        email: document.getElementById('contactEmail').value.trim(),
+        telefono: document.getElementById('contactTelefono').value.trim(),
+        descrizione: document.getElementById('contactDescrizione').value.trim(),
+        dove_conosciuto: document.getElementById('contactDoveConosciuto').value.trim(),
+        note: document.getElementById('contactNote').value.trim(),
+        url: document.getElementById('contactUrl').value.trim()
+    };
+    
+    // Rimuovi campi vuoti
+    Object.keys(contactData).forEach(key => {
+        if (!contactData[key]) delete contactData[key];
+    });
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/contacts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contactData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore creazione contatto');
+        }
+        
+        // Reset form e nascondi
+        document.getElementById('createContactForm').reset();
+        document.getElementById('contactForm').style.display = 'none';
+        
+        // Ricarica lista
+        await loadContacts();
+        alert('Contatto creato con successo!');
+        
+    } catch (error) {
+        console.error('Error creating contact:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+let currentEditContact = null;
+
+async function editContact(contactId) {
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/contacts?contact_id=${contactId}`);
+        if (!response.ok) {
+            throw new Error('Errore caricamento contatto');
+        }
+        
+        const data = await response.json();
+        const contact = data.contacts[0];
+        
+        if (!contact) {
+            throw new Error('Contatto non trovato');
+        }
+        
+        currentEditContact = contact;
+        
+        // Popola il modal
+        document.getElementById('editContactId').value = contact.contact_id;
+        document.getElementById('editContactNome').value = contact.nome || '';
+        document.getElementById('editContactCognome').value = contact.cognome || '';
+        document.getElementById('editContactEmail').value = contact.email || '';
+        document.getElementById('editContactTelefono').value = contact.telefono || '';
+        document.getElementById('editContactDescrizione').value = contact.descrizione || '';
+        document.getElementById('editContactDoveConosciuto').value = contact.dove_conosciuto || '';
+        document.getElementById('editContactNote').value = contact.note || '';
+        document.getElementById('editContactUrl').value = contact.url || '';
+        
+        // Mostra modal
+        document.getElementById('editContactModal').style.display = 'flex';
+        
+    } catch (error) {
+        console.error('Error loading contact for edit:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+async function deleteContact(contactId, contactName) {
+    if (!confirm(`Sei sicuro di voler eliminare "${contactName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/contacts`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contact_id: contactId })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore eliminazione contatto');
+        }
+        
+        await loadContacts();
+        alert('Contatto eliminato con successo!');
+        
+    } catch (error) {
+        console.error('Error deleting contact:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+async function handleUpdateContact(e) {
+    e.preventDefault();
+    
+    const contactData = {
+        contact_id: document.getElementById('editContactId').value,
+        nome: document.getElementById('editContactNome').value.trim(),
+        cognome: document.getElementById('editContactCognome').value.trim(),
+        email: document.getElementById('editContactEmail').value.trim(),
+        telefono: document.getElementById('editContactTelefono').value.trim(),
+        descrizione: document.getElementById('editContactDescrizione').value.trim(),
+        dove_conosciuto: document.getElementById('editContactDoveConosciuto').value.trim(),
+        note: document.getElementById('editContactNote').value.trim(),
+        url: document.getElementById('editContactUrl').value.trim()
+    };
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/contacts`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contactData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore aggiornamento contatto');
+        }
+        
+        // Close modal
+        document.getElementById('editContactModal').style.display = 'none';
+        currentEditContact = null;
+        
+        // Reload contacts
+        await loadContacts();
+        alert('Contatto aggiornato con successo!');
+        
+    } catch (error) {
+        console.error('Error updating contact:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+function closeEditContactModal() {
+    document.getElementById('editContactModal').style.display = 'none';
+    currentEditContact = null;
 }
 
 function closeEditGoalModal() {

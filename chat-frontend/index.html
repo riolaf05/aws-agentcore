@@ -26,6 +26,10 @@
                 <span class="nav-icon">💼</span>
                 <span class="nav-text">Progetti</span>
             </a>
+            <a href="#" class="nav-item" data-view="contacts">
+                <span class="nav-icon">👤</span>
+                <span class="nav-text">Contatti</span>
+            </a>
         </nav>
     </div>
 
@@ -212,6 +216,87 @@
                 </div>
             </div>
         </div>
+
+        <!-- Contacts View -->
+        <div id="contactsView" class="view">
+            <div class="section-container">
+                <div class="section-header">
+                    <div>
+                        <h1>👤 Contatti</h1>
+                        <div class="counter-badge">
+                            <span id="contactsCounter">0</span> contatti caricati
+                        </div>
+                    </div>
+                    <button id="newContactBtn" class="primary-btn">+ Nuovo Contatto</button>
+                </div>
+
+                <!-- Contacts Form (hidden by default) -->
+                <div id="contactForm" class="form-container" style="display: none;">
+                    <h2>Crea Nuovo Contatto</h2>
+                    <form id="createContactForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="contactNome">Nome</label>
+                                <input type="text" id="contactNome" placeholder="es. Mario">
+                            </div>
+                            <div class="form-group">
+                                <label for="contactCognome">Cognome</label>
+                                <input type="text" id="contactCognome" placeholder="es. Rossi">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="contactEmail">Email</label>
+                                <input type="email" id="contactEmail" placeholder="mario.rossi@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="contactTelefono">Telefono</label>
+                                <input type="tel" id="contactTelefono" placeholder="+39 123 456 7890">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="contactDescrizione">Descrizione</label>
+                            <textarea id="contactDescrizione" rows="3" placeholder="Breve descrizione del contatto..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="contactDoveConosciuto">Dove Conosciuto</label>
+                            <input type="text" id="contactDoveConosciuto" placeholder="es. Conferenza Tech, LinkedIn, Università">
+                        </div>
+                        <div class="form-group">
+                            <label for="contactNote">Note</label>
+                            <textarea id="contactNote" rows="2" placeholder="Note aggiuntive..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="contactUrl">URL</label>
+                            <input type="url" id="contactUrl" placeholder="https://linkedin.com/in/...">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Salva Contatto</button>
+                            <button type="button" id="cancelContactBtn" class="secondary-btn">Annulla</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Contacts Filters -->
+                <div class="filters-container">
+                    <input type="text" id="contactFilterNome" placeholder="Filtra per nome...">
+                    <input type="text" id="contactFilterCognome" placeholder="Filtra per cognome...">
+                    <input type="text" id="contactFilterDove" placeholder="Filtra per dove conosciuto...">
+                    <select id="contactSortOrder" class="secondary-btn" style="min-width: 200px;">
+                        <option value="date-desc">📅 Più recenti</option>
+                        <option value="date-asc">📅 Più vecchi</option>
+                        <option value="name-asc">🔤 Nome A-Z</option>
+                        <option value="name-desc">🔤 Nome Z-A</option>
+                    </select>
+                    <button id="refreshContactsBtn" class="secondary-btn">🔄 Aggiorna</button>
+                </div>
+
+                <!-- Contacts List -->
+                <div id="contactsList" class="items-list">
+                    <p class="loading">Caricamento contatti...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Edit Goal Modal -->
@@ -314,6 +399,59 @@
                 <div class="form-actions">
                     <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
                     <button type="button" class="secondary-btn" onclick="closeEditProjectModal()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Contact Modal -->
+    <div id="editContactModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Modifica Contatto</h2>
+                <button class="modal-close" onclick="closeEditContactModal()">&times;</button>
+            </div>
+            <form id="editContactForm" onsubmit="handleUpdateContact(event)">
+                <input type="hidden" id="editContactId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editContactNome">Nome</label>
+                        <input type="text" id="editContactNome">
+                    </div>
+                    <div class="form-group">
+                        <label for="editContactCognome">Cognome</label>
+                        <input type="text" id="editContactCognome">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editContactEmail">Email</label>
+                        <input type="email" id="editContactEmail">
+                    </div>
+                    <div class="form-group">
+                        <label for="editContactTelefono">Telefono</label>
+                        <input type="tel" id="editContactTelefono">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editContactDescrizione">Descrizione</label>
+                    <textarea id="editContactDescrizione" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editContactDoveConosciuto">Dove Conosciuto</label>
+                    <input type="text" id="editContactDoveConosciuto">
+                </div>
+                <div class="form-group">
+                    <label for="editContactNote">Note</label>
+                    <textarea id="editContactNote" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editContactUrl">URL</label>
+                    <input type="url" id="editContactUrl">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
+                    <button type="button" class="secondary-btn" onclick="closeEditContactModal()">Annulla</button>
                 </div>
             </form>
         </div>
