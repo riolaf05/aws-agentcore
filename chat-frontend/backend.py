@@ -36,6 +36,14 @@ CONTACT_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:Person
 CONTACT_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactGet"
 CONTACT_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactDelete"
 CONTACT_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactUpdate"
+EVENT_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-EventPost"
+EVENT_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-EventGet"
+EVENT_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-EventDelete"
+EVENT_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-EventUpdate"
+PLACE_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-PlacePost"
+PLACE_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-PlaceGet"
+PLACE_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-PlaceDelete"
+PLACE_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-PlaceUpdate"
 
 # Client AWS
 bedrock_client = boto3.client('bedrock-agentcore', region_name=REGION)
@@ -681,6 +689,346 @@ def update_contact():
         return jsonify({"error": f"Errore: {str(e)}"}), 500
 
 
+# ========================================
+# EVENT ENDPOINTS
+# ========================================
+
+@app.route('/api/events', methods=['GET'])
+def get_events():
+    """Recupera eventi con filtri opzionali"""
+    try:
+        params = request.args.to_dict()
+        logger.info(f"📅 Getting events with filters: {params}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=EVENT_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(params)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Found {body.get('count', 0)} events")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting events: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/events/<event_id>', methods=['GET'])
+def get_event(event_id):
+    """Recupera un evento specifico"""
+    try:
+        logger.info(f"📅 Getting event: {event_id}")
+        
+        response = lambda_client.invoke(
+            FunctionName=EVENT_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'event_id': event_id})
+        )
+        
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting event: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/events', methods=['POST'])
+def create_event():
+    """Crea un nuovo evento"""
+    try:
+        data = request.get_json()
+        logger.info(f"📅 Creating event: {data.get('nome')}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=EVENT_POST_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Event created successfully")
+            return jsonify(body), result.get('statusCode', 201)
+        
+        logger.info(f"Event created successfully")
+        return jsonify(result), 201
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating event: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/events/<event_id>', methods=['DELETE'])
+def delete_event(event_id):
+    """Elimina un evento"""
+    try:
+        logger.info(f"📅 Deleting event: {event_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=EVENT_DELETE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'event_id': event_id})
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Event deleted successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Event deleted successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting event: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/events/<event_id>', methods=['PUT'])
+def update_event(event_id):
+    """Aggiorna un evento esistente"""
+    try:
+        data = request.get_json()
+        data['event_id'] = event_id
+        
+        logger.info(f"✏️ Updating event: {event_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=EVENT_UPDATE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Event updated successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Event updated successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating event: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+# ========================================
+# PLACE ENDPOINTS
+# ========================================
+
+@app.route('/api/places', methods=['GET'])
+def get_places():
+    """Recupera luoghi con filtri opzionali"""
+    try:
+        params = request.args.to_dict()
+        logger.info(f"📍 Getting places with filters: {params}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=PLACE_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(params)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Found {body.get('count', 0)} places")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting places: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/places/<place_id>', methods=['GET'])
+def get_place(place_id):
+    """Recupera un luogo specifico"""
+    try:
+        logger.info(f"📍 Getting place: {place_id}")
+        
+        response = lambda_client.invoke(
+            FunctionName=PLACE_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'place_id': place_id})
+        )
+        
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting place: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/places', methods=['POST'])
+def create_place():
+    """Crea un nuovo luogo"""
+    try:
+        data = request.get_json()
+        logger.info(f"📍 Creating place: {data.get('nome')}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=PLACE_POST_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Place created successfully")
+            return jsonify(body), result.get('statusCode', 201)
+        
+        logger.info(f"Place created successfully")
+        return jsonify(result), 201
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating place: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/places/<place_id>', methods=['DELETE'])
+def delete_place(place_id):
+    """Elimina un luogo"""
+    try:
+        logger.info(f"📍 Deleting place: {place_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=PLACE_DELETE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'place_id': place_id})
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Place deleted successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Place deleted successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting place: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/places/<place_id>', methods=['PUT'])
+def update_place(place_id):
+    """Aggiorna un luogo esistente"""
+    try:
+        data = request.get_json()
+        data['place_id'] = place_id
+        
+        logger.info(f"✏️ Updating place: {place_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=PLACE_UPDATE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Place updated successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Place updated successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating place: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("🚀 Personal Assistant Backend Server")
@@ -703,6 +1051,14 @@ if __name__ == '__main__':
     print("  POST /api/contacts    - Crea contatto")
     print("  PUT  /api/contacts    - Aggiorna contatto")
     print("  DELETE /api/contacts  - Cancella contatto")
+    print("  GET  /api/events      - Recupera eventi")
+    print("  POST /api/events      - Crea evento")
+    print("  PUT  /api/events      - Aggiorna evento")
+    print("  DELETE /api/events    - Cancella evento")
+    print("  GET  /api/places      - Recupera luoghi")
+    print("  POST /api/places      - Crea luogo")
+    print("  PUT  /api/places      - Aggiorna luogo")
+    print("  DELETE /api/places    - Cancella luogo")
     print("=" * 60)
     
     app.run(host='0.0.0.0', port=5000, debug=True)
