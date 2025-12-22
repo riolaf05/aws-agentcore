@@ -1,19 +1,19 @@
-default_agent: orchestrator
+default_agent: task_reader
 agents:
-  orchestrator:
-    name: orchestrator
-    entrypoint: C:/Users/r.laface/Desktop/Codice/aws-agentcore/agents/orchestrator/agent.py
+  task_reader:
+    name: task_reader
+    entrypoint: C:/Users/r.laface/Desktop/Codice/aws-agentcore/agents/task-reader/agent.py
     deployment_type: container
     runtime_type: null
     platform: linux/arm64
     container_runtime: none
-    source_path: C:\Users\r.laface\Desktop\Codice\aws-agentcore\agents\orchestrator
+    source_path: C:\Users\r.laface\Desktop\Codice\aws-agentcore\agents\task-reader
     aws:
-      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-11376b7e2a
+      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-79ca02cf4a
       execution_role_auto_create: false
       account: '879338784410'
       region: us-east-1
-      ecr_repository: 879338784410.dkr.ecr.us-east-1.amazonaws.com/bedrock-agentcore-orchestrator
+      ecr_repository: 879338784410.dkr.ecr.us-east-1.amazonaws.com/bedrock-agentcore-task_reader
       ecr_auto_create: false
       s3_path: null
       s3_auto_create: false
@@ -28,20 +28,20 @@ agents:
         idle_runtime_session_timeout: null
         max_lifetime: null
     bedrock_agentcore:
-      agent_id: orchestrator-HR2F4m7QCY
-      agent_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/orchestrator-HR2F4m7QCY
-      agent_session_id: null
+      agent_id: task_reader-aEBvIeHdvC
+      agent_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/task_reader-aEBvIeHdvC
+      agent_session_id: cc4ca99b-6e86-48af-96e9-6b3810881aa5
     codebuild:
-      project_name: bedrock-agentcore-orchestrator-builder
-      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-11376b7e2a
+      project_name: bedrock-agentcore-task_reader-builder
+      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-79ca02cf4a
       source_bucket: bedrock-agentcore-codebuild-sources-879338784410-us-east-1
     memory:
-      mode: STM_AND_LTM
-      memory_id: orchestrator_mem-SyV4bj45mc
-      memory_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:memory/orchestrator_mem-SyV4bj45mc
-      memory_name: orchestrator_mem
+      mode: NO_MEMORY
+      memory_id: null
+      memory_arn: null
+      memory_name: null
       event_expiry_days: 30
-      first_invoke_memory_check_done: true
+      first_invoke_memory_check_done: false
       was_created_by_toolkit: false
     identity:
       credential_providers: []

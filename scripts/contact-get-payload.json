@@ -1,0 +1,20 @@
+{
+  "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactGet",
+  "toolSchema": {
+    "inlinePayload": [{
+      "name": "get-contact",
+      "description": "Recupera contatti con filtri per nome, cognome, email o luogo di conoscenza.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nome": {"type": "string", "description": "Filtra per nome (ricerca parziale)"},
+          "cognome": {"type": "string", "description": "Filtra per cognome"},
+          "email": {"type": "string", "description": "Filtra per email"},
+          "dove_conosciuto": {"type": "string", "description": "Filtra per luogo/evento di conoscenza"},
+          "contact_id": {"type": "string", "description": "ID specifico del contatto da recuperare"},
+          "limit": {"type": "number", "description": "Numero massimo di risultati (default: 100)"}
+        }
+      }
+    }]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactDelete",
+  "toolSchema": {
+    "inlinePayload": [{
+      "name": "delete-contact",
+      "description": "Elimina un contatto esistente dal database.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {"type": "string", "description": "ID del contatto da eliminare"}
+        },
+        "required": ["contact_id"]
+      }
+    }]
+  }
+}

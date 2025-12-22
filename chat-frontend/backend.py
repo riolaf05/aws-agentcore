@@ -1,5 +1,9 @@
 """
-Backend proxy per connettere il frontend chat all'orchestrator deployato su AWS.
+Backend proxy per connettere il frontend all'orchestrator e alle API Lambda.
+Fornisce endpoint per:
+- Chat con orchestrator AWS
+- CRUD per Goals
+- CRUD per Projects
 """
 
 from flask import Flask, request, jsonify
@@ -7,6 +11,7 @@ from flask_cors import CORS
 import boto3
 import json
 import logging
+import os
 
 app = Flask(__name__)
 CORS(app)  # Abilita CORS per il frontend
@@ -16,10 +21,25 @@ logger = logging.getLogger(__name__)
 
 # Configurazione AWS
 ORCHESTRATOR_ARN = "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/orchestrator-HR2F4m7QCY"
-REGION = "us-east-1"    
+REGION = "us-east-1"
+
+# ARN Lambda (aggiornati dopo il deploy)
+GOAL_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-GoalPost"
+GOAL_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-GoalGet"
+GOAL_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-GoalDelete"
+GOAL_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-GoalUpdate"
+PROJECT_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectPost"
+PROJECT_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectGet"
+PROJECT_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectDelete"
+PROJECT_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectUpdate"
+CONTACT_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactPost"
+CONTACT_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactGet"
+CONTACT_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactDelete"
+CONTACT_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactUpdate"
 
 # Client AWS
 bedrock_client = boto3.client('bedrock-agentcore', region_name=REGION)
+lambda_client = boto3.client('lambda', region_name=REGION)
 
 
 @app.route('/health', methods=['GET'])
@@ -138,16 +158,552 @@ def invoke_orchestrator():
         return jsonify({"error": str(e)}), 500
 
 
+# ========================================
+# GOALS API
+# ========================================
+
+@app.route('/api/goals', methods=['GET'])
+def get_goals():
+    """Recupera goals da Lambda"""
+    try:
+        # Estrai query params
+        params = {
+            'ambito': request.args.get('ambito'),
+            'status': request.args.get('status'),
+            'priorita': request.args.get('priorita'),
+            'goal_id': request.args.get('goal_id'),
+            'limit': request.args.get('limit', '100')
+        }
+        
+        # Rimuovi parametri None
+        params = {k: v for k, v in params.items() if v}
+        
+        logger.info(f"Getting goals with params: {params}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=GOAL_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(params)
+        )
+        
+        result = json.loads(response['Payload'].read())
+        logger.debug(f"Lambda response: {result}")
+        
+        # Gestisci errori Lambda
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting goals: {str(e)}")
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/goals', methods=['POST'])
+def create_goal():
+    """Crea un nuovo goal"""
+    try:
+        data = request.get_json()
+        logger.info(f"Creating goal: {data.get('titolo')}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=GOAL_POST_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        result = json.loads(response['Payload'].read())
+        logger.debug(f"Lambda response: {result}")
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"Error creating goal: {str(e)}")
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/goals', methods=['DELETE'])
+def delete_goal():
+    """Cancella un goal esistente"""
+    try:
+        goal_id = request.args.get('goal_id')
+        
+        if not goal_id:
+            logger.warning("DELETE goal called without goal_id")
+            return jsonify({"error": "goal_id è obbligatorio"}), 400
+        
+        logger.info(f"🗑️ Deleting goal: {goal_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=GOAL_DELETE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'goal_id': goal_id})
+        )
+        
+        logger.info(f"Lambda StatusCode: {response['StatusCode']}")
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        logger.info(f"Raw payload: {payload_bytes}")
+        
+        result = json.loads(payload_bytes)
+        logger.info(f"Parsed Lambda response: {result}")
+        
+        # Controlla errori Lambda
+        if response['StatusCode'] != 200:
+            logger.error(f"Lambda invocation failed with status {response['StatusCode']}")
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente
+        if 'body' in result:
+            logger.info(f"Extracting body from result, type: {type(result['body'])}")
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            status_code = result.get('statusCode', 200)
+            logger.info(f"Returning body with status {status_code}: {body}")
+            return jsonify(body), status_code
+        
+        logger.info(f"Returning direct result: {result}")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting goal: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/goals', methods=['PUT'])
+def update_goal():
+    """Aggiorna un goal esistente"""
+    try:
+        data = request.get_json()
+        goal_id = data.get('goal_id')
+        
+        if not goal_id:
+            logger.warning("PUT goal called without goal_id")
+            return jsonify({"error": "goal_id è obbligatorio"}), 400
+        
+        logger.info(f"✏️ Updating goal: {goal_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=GOAL_UPDATE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        logger.info(f"Lambda StatusCode: {response['StatusCode']}")
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        logger.debug(f"Raw payload: {payload_bytes}")
+        
+        result = json.loads(payload_bytes)
+        logger.info(f"Parsed Lambda response: {result}")
+        
+        # Controlla errori Lambda
+        if response['StatusCode'] != 200:
+            logger.error(f"Lambda invocation failed with status {response['StatusCode']}")
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            status_code = result.get('statusCode', 200)
+            logger.info(f"Returning body with status {status_code}")
+            return jsonify(body), status_code
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating goal: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+# ========================================
+# PROJECTS API
+# ========================================
+
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    """Recupera projects da Lambda"""
+    try:
+        params = {
+            'ambito': request.args.get('ambito'),
+            'tag': request.args.get('tag'),
+            'project_id': request.args.get('project_id'),
+            'limit': request.args.get('limit', '100')
+        }
+        
+        # Rimuovi parametri None
+        params = {k: v for k, v in params.items() if v}
+        
+        logger.info(f"Getting projects with params: {params}")
+        
+        response = lambda_client.invoke(
+            FunctionName=PROJECT_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(params)
+        )
+        
+        result = json.loads(response['Payload'].read())
+        logger.debug(f"Lambda response: {result}")
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting projects: {str(e)}")
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/projects', methods=['POST'])
+def create_project():
+    """Crea un nuovo project"""
+    try:
+        data = request.get_json()
+        logger.info(f"Creating project: {data.get('titolo')}")
+        
+        response = lambda_client.invoke(
+            FunctionName=PROJECT_POST_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        result = json.loads(response['Payload'].read())
+        logger.debug(f"Lambda response: {result}")
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"Error creating project: {str(e)}")
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/projects', methods=['DELETE'])
+def delete_project():
+    """Cancella un project esistente"""
+    try:
+        project_id = request.args.get('project_id')
+        
+        if not project_id:
+            logger.warning("DELETE project called without project_id")
+            return jsonify({"error": "project_id è obbligatorio"}), 400
+        
+        logger.info(f"🗑️ Deleting project: {project_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=PROJECT_DELETE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'project_id': project_id})
+        )
+        
+        logger.info(f"Lambda StatusCode: {response['StatusCode']}")
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        logger.info(f"Raw payload: {payload_bytes}")
+        
+        result = json.loads(payload_bytes)
+        logger.info(f"Parsed Lambda response: {result}")
+        
+        # Controlla errori Lambda
+        if response['StatusCode'] != 200:
+            logger.error(f"Lambda invocation failed with status {response['StatusCode']}")
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente
+        if 'body' in result:
+            logger.info(f"Extracting body from result, type: {type(result['body'])}")
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            status_code = result.get('statusCode', 200)
+            logger.info(f"Returning body with status {status_code}: {body}")
+            return jsonify(body), status_code
+        
+        logger.info(f"Returning direct result: {result}")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting project: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/projects', methods=['PUT'])
+def update_project():
+    """Aggiorna un project esistente"""
+    try:
+        data = request.get_json()
+        project_id = data.get('project_id')
+        
+        if not project_id:
+            logger.warning("PUT project called without project_id")
+            return jsonify({"error": "project_id è obbligatorio"}), 400
+        
+        logger.info(f"✏️ Updating project: {project_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=PROJECT_UPDATE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        logger.info(f"Lambda StatusCode: {response['StatusCode']}")
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        logger.debug(f"Raw payload: {payload_bytes}")
+        
+        result = json.loads(payload_bytes)
+        logger.info(f"Parsed Lambda response: {result}")
+        
+        # Controlla errori Lambda
+        if response['StatusCode'] != 200:
+            logger.error(f"Lambda invocation failed with status {response['StatusCode']}")
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            status_code = result.get('statusCode', 200)
+            logger.info(f"Returning body with status {status_code}")
+            return jsonify(body), status_code
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating project: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+# ========================================
+# CONTACTS API (Proxy to Lambda)
+# ========================================
+
+@app.route('/api/contacts', methods=['GET'])
+def get_contacts():
+    """Recupera contatti con filtri opzionali"""
+    try:
+        # Ottieni parametri query
+        nome = request.args.get('nome', '')
+        cognome = request.args.get('cognome', '')
+        email = request.args.get('email', '')
+        dove_conosciuto = request.args.get('dove_conosciuto', '')
+        contact_id = request.args.get('contact_id', '')
+        limit = request.args.get('limit', '100')
+        
+        # Costruisci payload
+        payload = {}
+        if nome:
+            payload['nome'] = nome
+        if cognome:
+            payload['cognome'] = cognome
+        if email:
+            payload['email'] = email
+        if dove_conosciuto:
+            payload['dove_conosciuto'] = dove_conosciuto
+        if contact_id:
+            payload['contact_id'] = contact_id
+        if limit:
+            payload['limit'] = int(limit)
+        
+        logger.info(f"📖 Getting contacts with filters: {payload}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=CONTACT_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(payload)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Lambda returned {len(body.get('contacts', []))} contacts")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Lambda returned {len(result.get('contacts', []))} contacts")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting contacts: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/contacts', methods=['POST'])
+def create_contact():
+    """Crea un nuovo contatto"""
+    try:
+        data = request.get_json()
+        logger.info(f"➕ Creating contact: {data.get('nome', '')} {data.get('cognome', '')}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=CONTACT_POST_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Contact created: {body.get('contact_id', 'unknown')}")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Contact created: {result.get('contact_id', 'unknown')}")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating contact: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/contacts', methods=['DELETE'])
+def delete_contact():
+    """Elimina un contatto"""
+    try:
+        data = request.get_json()
+        contact_id = data.get('contact_id')
+        
+        if not contact_id:
+            return jsonify({"error": "contact_id è obbligatorio"}), 400
+        
+        logger.info(f"🗑️ Deleting contact: {contact_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=CONTACT_DELETE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Contact deleted successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Contact deleted successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting contact: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/contacts', methods=['PUT'])
+def update_contact():
+    """Aggiorna un contatto esistente"""
+    try:
+        data = request.get_json()
+        contact_id = data.get('contact_id')
+        
+        if not contact_id:
+            return jsonify({"error": "contact_id è obbligatorio"}), 400
+        
+        logger.info(f"✏️ Updating contact: {contact_id}")
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=CONTACT_UPDATE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(data)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Contact updated successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"Contact updated successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating contact: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
 if __name__ == '__main__':
     print("=" * 60)
-    print("🚀 Orchestrator Proxy Server")
+    print("🚀 Personal Assistant Backend Server")
     print("=" * 60)
     print(f"Orchestrator ARN: {ORCHESTRATOR_ARN}")
     print(f"Region: {REGION}")
     print(f"Server: http://localhost:5000")
     print("=" * 60)
-    print("\nAGGIORNA 'ORCHESTRATOR_ARN' con il tuo ARN prima di avviare!")
-    print("Trova l'ARN con: agentcore list (se disponibile)")
+    print("\nEndpoints disponibili:")
+    print("  POST /invoke          - Chat con orchestrator")
+    print("  GET  /api/goals       - Recupera obiettivi")
+    print("  POST /api/goals       - Crea obiettivo")
+    print("  PUT  /api/goals       - Aggiorna obiettivo")
+    print("  DELETE /api/goals     - Cancella obiettivo")
+    print("  GET  /api/projects    - Recupera progetti")
+    print("  POST /api/projects    - Crea progetto")
+    print("  PUT  /api/projects    - Aggiorna progetto")
+    print("  DELETE /api/projects  - Cancella progetto")
+    print("  GET  /api/contacts    - Recupera contatti")
+    print("  POST /api/contacts    - Crea contatto")
+    print("  PUT  /api/contacts    - Aggiorna contatto")
+    print("  DELETE /api/contacts  - Cancella contatto")
     print("=" * 60)
     
     app.run(host='0.0.0.0', port=5000, debug=True)
+
