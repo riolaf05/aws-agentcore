@@ -6,12 +6,42 @@
     <title>Personal Assistant</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="modal-styles.css">
+    <!-- AWS Cognito SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
 </head>
 <body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🤖 Personal Assistant</h1>
+                <p>Effettua il login per accedere</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username o Email</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+                <div id="loginError" class="login-error" style="display: none;"></div>
+                <button type="submit" class="login-btn" id="loginBtn">Accedi</button>
+            </form>
+            <div class="login-footer">
+                <p>Contatta l'amministratore per ottenere le credenziali</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application (hidden until login) -->
+    <div id="mainApp" style="display: none;">
     <!-- Sidebar Menu -->
     <div class="sidebar">
         <div class="sidebar-header">
             <h2>📋 Menu</h2>
+            <button id="logoutBtn" class="logout-btn" title="Logout">🚪</button>
         </div>
         <nav class="sidebar-nav">
             <a href="#" class="nav-item active" data-view="chat">
@@ -29,6 +59,10 @@
             <a href="#" class="nav-item" data-view="contacts">
                 <span class="nav-icon">👤</span>
                 <span class="nav-text">Contatti</span>
+            </a>
+            <a href="#" class="nav-item" data-view="events">
+                <span class="nav-icon">📍</span>
+                <span class="nav-text">Eventi&Luoghi</span>
             </a>
         </nav>
     </div>
@@ -297,6 +331,118 @@
                 </div>
             </div>
         </div>
+
+        <!-- Events & Places View -->
+        <div id="eventsView" class="view">
+            <div class="section-container">
+                <div class="section-header">
+                    <h1>📍 Eventi & Luoghi</h1>
+                    <div class="button-group">
+                        <button id="newEventBtn" class="primary-btn">+ Nuovo Evento</button>
+                        <button id="newPlaceBtn" class="primary-btn">+ Nuovo Luogo</button>
+                    </div>
+                </div>
+
+                <!-- Event Form (hidden by default) -->
+                <div id="eventForm" class="form-container" style="display: none;">
+                    <h2>Crea Nuovo Evento</h2>
+                    <form id="createEventForm">
+                        <div class="form-group">
+                            <label for="eventNome">Nome Evento *</label>
+                            <input type="text" id="eventNome" placeholder="es. AWS Summit Milano 2024" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="eventData">Data</label>
+                                <input type="date" id="eventData">
+                            </div>
+                            <div class="form-group">
+                                <label for="eventLuogo">Luogo</label>
+                                <input type="text" id="eventLuogo" placeholder="es. Milano Convention Center">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="eventDescrizione">Descrizione</label>
+                            <textarea id="eventDescrizione" rows="4" placeholder="Descrizione dettagliata dell'evento..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Salva Evento</button>
+                            <button type="button" id="cancelEventBtn" class="secondary-btn">Annulla</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Place Form (hidden by default) -->
+                <div id="placeForm" class="form-container" style="display: none;">
+                    <h2>Crea Nuovo Luogo</h2>
+                    <form id="createPlaceForm">
+                        <div class="form-group">
+                            <label for="placeNome">Nome Luogo *</label>
+                            <input type="text" id="placeNome" placeholder="es. Ristorante La Pergola" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="placeCategoria">Categoria</label>
+                                <select id="placeCategoria">
+                                    <option value="">Seleziona categoria</option>
+                                    <option value="ristorante">🍽️ Ristorante</option>
+                                    <option value="sport">⚽ Sport</option>
+                                    <option value="agriturismo">🌾 Agriturismo</option>
+                                    <option value="museo">🏛️ Museo</option>
+                                    <option value="teatro">🎭 Teatro</option>
+                                    <option value="cinema">🎬 Cinema</option>
+                                    <option value="bar">🍺 Bar/Pub</option>
+                                    <option value="hotel">🏨 Hotel</option>
+                                    <option value="parco">🌳 Parco</option>
+                                    <option value="altro">📌 Altro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="placeIndirizzo">Indirizzo</label>
+                                <input type="text" id="placeIndirizzo" placeholder="Via, Città, CAP">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="placeDescrizione">Descrizione</label>
+                            <textarea id="placeDescrizione" rows="4" placeholder="Descrizione del luogo..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Salva Luogo</button>
+                            <button type="button" id="cancelPlaceBtn" class="secondary-btn">Annulla</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Events & Places Filters -->
+                <div class="filters-container">
+                    <select id="eventPlaceType">
+                        <option value="all">📋 Tutti</option>
+                        <option value="events">📅 Solo Eventi</option>
+                        <option value="places">📍 Solo Luoghi</option>
+                    </select>
+                    <input type="text" id="eventPlaceFilterLocation" placeholder="Filtra per posizione...">
+                    <select id="eventPlaceFilterCategory">
+                        <option value="">Tutte le categorie</option>
+                        <option value="ristorante">🍽️ Ristorante</option>
+                        <option value="sport">⚽ Sport</option>
+                        <option value="agriturismo">🌾 Agriturismo</option>
+                        <option value="museo">🏛️ Museo</option>
+                        <option value="teatro">🎭 Teatro</option>
+                        <option value="cinema">🎬 Cinema</option>
+                        <option value="bar">🍺 Bar/Pub</option>
+                        <option value="hotel">🏨 Hotel</option>
+                        <option value="parco">🌳 Parco</option>
+                        <option value="altro">📌 Altro</option>
+                    </select>
+                    <button id="refreshEventsPlacesBtn" class="secondary-btn">🔄 Aggiorna</button>
+                </div>
+
+                <!-- Events & Places List -->
+                <div id="eventsPlacesList" class="items-list">
+                    <p class="loading">Caricamento eventi e luoghi...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Edit Goal Modal -->
@@ -457,6 +603,91 @@
         </div>
     </div>
 
+    <!-- Edit Event Modal -->
+    <div id="editEventModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Modifica Evento</h2>
+                <button class="modal-close" onclick="closeEditEventModal()">&times;</button>
+            </div>
+            <form id="editEventForm" onsubmit="handleUpdateEvent(event)">
+                <input type="hidden" id="editEventId">
+                <div class="form-group">
+                    <label for="editEventNome">Nome Evento *</label>
+                    <input type="text" id="editEventNome" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editEventData">Data</label>
+                        <input type="date" id="editEventData">
+                    </div>
+                    <div class="form-group">
+                        <label for="editEventLuogo">Luogo</label>
+                        <input type="text" id="editEventLuogo">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editEventDescrizione">Descrizione</label>
+                    <textarea id="editEventDescrizione" rows="4"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
+                    <button type="button" class="secondary-btn" onclick="closeEditEventModal()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Place Modal -->
+    <div id="editPlaceModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Modifica Luogo</h2>
+                <button class="modal-close" onclick="closeEditPlaceModal()">&times;</button>
+            </div>
+            <form id="editPlaceForm" onsubmit="handleUpdatePlace(event)">
+                <input type="hidden" id="editPlaceId">
+                <div class="form-group">
+                    <label for="editPlaceNome">Nome Luogo *</label>
+                    <input type="text" id="editPlaceNome" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editPlaceCategoria">Categoria</label>
+                        <select id="editPlaceCategoria">
+                            <option value="">Seleziona categoria</option>
+                            <option value="ristorante">🍽️ Ristorante</option>
+                            <option value="sport">⚽ Sport</option>
+                            <option value="agriturismo">🌾 Agriturismo</option>
+                            <option value="museo">🏛️ Museo</option>
+                            <option value="teatro">🎭 Teatro</option>
+                            <option value="cinema">🎬 Cinema</option>
+                            <option value="bar">🍺 Bar/Pub</option>
+                            <option value="hotel">🏨 Hotel</option>
+                            <option value="parco">🌳 Parco</option>
+                            <option value="altro">📌 Altro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPlaceIndirizzo">Indirizzo</label>
+                        <input type="text" id="editPlaceIndirizzo">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editPlaceDescrizione">Descrizione</label>
+                    <textarea id="editPlaceDescrizione" rows="4"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
+                    <button type="button" class="secondary-btn" onclick="closeEditPlaceModal()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    </div> <!-- Fine mainApp -->
+
+    <script src="cognito-config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

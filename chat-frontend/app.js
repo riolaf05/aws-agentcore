@@ -1,14 +1,39 @@
 // Configurazione
 const CONFIG = {
-    ORCHESTRATOR_URL: 'http://localhost:5000/invoke',  // Backend proxy per orchestrator AWS
-    API_URL: 'http://localhost:5000/api',  // API Gateway locale (sarà aggiornato dopo deploy)
-    ACTOR_ID: 'chat-user'
+    ORCHESTRATOR_URL: 'http://localhost:5000/invoke',
+    API_URL: 'http://localhost:5000/api',
+    ACTOR_ID: 'chat-user',
+    // Cognito Configuration
+    COGNITO_USER_POOL_ID: 'us-east-1_Lza70tSUs',
+    COGNITO_CLIENT_ID: '1pm6fmgvar40go8cpimf6bo9lm',
+    COGNITO_REGION: 'us-east-1'
 };
+
+// Cognito User Pool Setup
+let userPool;
+let cognitoUser;
+
+if (typeof AmazonCognitoIdentity !== 'undefined') {
+    const poolData = {
+        UserPoolId: CONFIG.COGNITO_USER_POOL_ID,
+        ClientId: CONFIG.COGNITO_CLIENT_ID
+    };
+    userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+}
 
 // Stato dell'applicazione
 let sessionId = generateSessionId();
 let isLoading = false;
 let currentView = 'chat';
+let currentUser = null;
+let idToken = null;
+
+// Elementi DOM - Login
+const loginScreen = document.getElementById('loginScreen');
+const mainApp = document.getElementById('mainApp');
+const loginForm = document.getElementById('loginForm');
+const loginError = document.getElementById('loginError');
+const logoutBtn = document.getElementById('logoutBtn');
 
 // Elementi DOM - Chat
 const chatMessages = document.getElementById('chatMessages');
@@ -55,8 +80,30 @@ const contactFilterNome = document.getElementById('contactFilterNome');
 const contactFilterCognome = document.getElementById('contactFilterCognome');
 const contactFilterDove = document.getElementById('contactFilterDove');
 
+// Elementi DOM - Events & Places
+const newEventBtn = document.getElementById('newEventBtn');
+const newPlaceBtn = document.getElementById('newPlaceBtn');
+const eventForm = document.getElementById('eventForm');
+const placeForm = document.getElementById('placeForm');
+const createEventForm = document.getElementById('createEventForm');
+const createPlaceForm = document.getElementById('createPlaceForm');
+const cancelEventBtn = document.getElementById('cancelEventBtn');
+const cancelPlaceBtn = document.getElementById('cancelPlaceBtn');
+const eventsPlacesList = document.getElementById('eventsPlacesList');
+const refreshEventsPlacesBtn = document.getElementById('refreshEventsPlacesBtn');
+const eventPlaceType = document.getElementById('eventPlaceType');
+const eventPlaceFilterLocation = document.getElementById('eventPlaceFilterLocation');
+const eventPlaceFilterCategory = document.getElementById('eventPlaceFilterCategory');
+
 // Inizializzazione
 function init() {
+    // Check if user is already logged in
+    checkLoginStatus();
+    
+    // Login event listeners
+    loginForm.addEventListener('submit', handleLogin);
+    logoutBtn.addEventListener('click', handleLogout);
+    
     // Chat setup
     sessionIdDisplay.textContent = sessionId;
     checkOrchestratorStatus();
@@ -124,6 +171,30 @@ function init() {
         });
     }
     
+    // Events & Places event listeners
+    newEventBtn.addEventListener('click', () => {
+        eventForm.style.display = 'block';
+        placeForm.style.display = 'none';
+    });
+    newPlaceBtn.addEventListener('click', () => {
+        placeForm.style.display = 'block';
+        eventForm.style.display = 'none';
+    });
+    cancelEventBtn.addEventListener('click', () => {
+        eventForm.style.display = 'none';
+        createEventForm.reset();
+    });
+    cancelPlaceBtn.addEventListener('click', () => {
+        placeForm.style.display = 'none';
+        createPlaceForm.reset();
+    });
+    createEventForm.addEventListener('submit', handleCreateEvent);
+    createPlaceForm.addEventListener('submit', handleCreatePlace);
+    refreshEventsPlacesBtn.addEventListener('click', loadEventsAndPlaces);
+    eventPlaceType.addEventListener('change', loadEventsAndPlaces);
+    eventPlaceFilterLocation.addEventListener('input', loadEventsAndPlaces);
+    eventPlaceFilterCategory.addEventListener('change', loadEventsAndPlaces);
+    
     // Focus sull'input
     messageInput.focus();
 }
@@ -157,6 +228,8 @@ function switchView(viewName) {
         loadProjects();
     } else if (viewName === 'contacts') {
         loadContacts();
+    } else if (viewName === 'events') {
+        loadEventsAndPlaces();
     }
 }
 
@@ -1251,6 +1324,583 @@ function closeEditGoalModal() {
 function closeEditProjectModal() {
     document.getElementById('editProjectModal').style.display = 'none';
     currentEditProject = null;
+}
+
+// ========================================
+// EVENTS & PLACES
+// ========================================
+
+// Load Events and Places
+async function loadEventsAndPlaces() {
+    try {
+        const type = eventPlaceType.value;
+        const location = eventPlaceFilterLocation.value.trim();
+        const category = eventPlaceFilterCategory.value;
+        
+        let events = [];
+        let places = [];
+        
+        // Load events if needed
+        if (type === 'all' || type === 'events') {
+            const eventParams = new URLSearchParams();
+            if (location) eventParams.append('luogo', location);
+            
+            const eventResponse = await fetch(`${CONFIG.API_URL}/events?${eventParams}`);
+            if (eventResponse.ok) {
+                const eventData = await eventResponse.json();
+                events = eventData.events || [];
+            }
+        }
+        
+        // Load places if needed
+        if (type === 'all' || type === 'places') {
+            const placeParams = new URLSearchParams();
+            if (location) placeParams.append('indirizzo', location);
+            if (category) placeParams.append('categoria', category);
+            
+            const placeResponse = await fetch(`${CONFIG.API_URL}/places?${placeParams}`);
+            if (placeResponse.ok) {
+                const placeData = await placeResponse.json();
+                places = placeData.places || [];
+            }
+        }
+        
+        displayEventsAndPlaces(events, places);
+        
+    } catch (error) {
+        console.error('Error loading events and places:', error);
+        eventsPlacesList.innerHTML = '<p class="error">Errore nel caricamento. Riprova.</p>';
+    }
+}
+
+function displayEventsAndPlaces(events, places) {
+    if (events.length === 0 && places.length === 0) {
+        eventsPlacesList.innerHTML = '<p class="no-data">Nessun evento o luogo trovato. Aggiungine uno!</p>';
+        return;
+    }
+    
+    let html = '';
+    
+    // Display events
+    events.forEach(event => {
+        html += `
+            <div class="item-card">
+                <div class="item-header">
+                    <div>
+                        <div class="item-badge event-badge">📅 Evento</div>
+                        <h3>${escapeHtml(event.nome)}</h3>
+                    </div>
+                    <div class="item-actions">
+                        <button onclick="editEvent('${event.event_id}')" class="edit-btn" title="Modifica">✏️</button>
+                        <button onclick="deleteEvent('${event.event_id}')" class="delete-btn" title="Elimina">🗑️</button>
+                    </div>
+                </div>
+                <div class="item-body">
+                    ${event.data ? `<p><strong>📅 Data:</strong> ${formatDate(event.data)}</p>` : ''}
+                    ${event.luogo ? `<p><strong>📍 Luogo:</strong> ${escapeHtml(event.luogo)}</p>` : ''}
+                    ${event.descrizione ? `<p><strong>📝 Descrizione:</strong> ${escapeHtml(event.descrizione)}</p>` : ''}
+                </div>
+                <div class="item-footer">
+                    <small>Creato: ${new Date(event.created_at).toLocaleString('it-IT')}</small>
+                </div>
+            </div>
+        `;
+    });
+    
+    // Display places
+    places.forEach(place => {
+        const categoryEmoji = getCategoryEmoji(place.categoria);
+        html += `
+            <div class="item-card">
+                <div class="item-header">
+                    <div>
+                        <div class="item-badge place-badge">📍 Luogo</div>
+                        <h3>${categoryEmoji} ${escapeHtml(place.nome)}</h3>
+                    </div>
+                    <div class="item-actions">
+                        <button onclick="editPlace('${place.place_id}')" class="edit-btn" title="Modifica">✏️</button>
+                        <button onclick="deletePlace('${place.place_id}')" class="delete-btn" title="Elimina">🗑️</button>
+                    </div>
+                </div>
+                <div class="item-body">
+                    ${place.categoria ? `<p><strong>🏷️ Categoria:</strong> ${getCategoryLabel(place.categoria)}</p>` : ''}
+                    ${place.indirizzo ? `<p><strong>📮 Indirizzo:</strong> ${escapeHtml(place.indirizzo)}</p>` : ''}
+                    ${place.descrizione ? `<p><strong>📝 Descrizione:</strong> ${escapeHtml(place.descrizione)}</p>` : ''}
+                </div>
+                <div class="item-footer">
+                    <small>Creato: ${new Date(place.created_at).toLocaleString('it-IT')}</small>
+                </div>
+            </div>
+        `;
+    });
+    
+    eventsPlacesList.innerHTML = html;
+}
+
+// Helper functions for places
+function getCategoryEmoji(category) {
+    const emojiMap = {
+        'ristorante': '🍽️',
+        'sport': '⚽',
+        'agriturismo': '🌾',
+        'museo': '🏛️',
+        'teatro': '🎭',
+        'cinema': '🎬',
+        'bar': '🍺',
+        'hotel': '🏨',
+        'parco': '🌳',
+        'altro': '📌'
+    };
+    return emojiMap[category] || '📍';
+}
+
+function getCategoryLabel(category) {
+    const labelMap = {
+        'ristorante': 'Ristorante',
+        'sport': 'Sport',
+        'agriturismo': 'Agriturismo',
+        'museo': 'Museo',
+        'teatro': 'Teatro',
+        'cinema': 'Cinema',
+        'bar': 'Bar/Pub',
+        'hotel': 'Hotel',
+        'parco': 'Parco',
+        'altro': 'Altro'
+    };
+    return labelMap[category] || category;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('it-IT', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Create Event
+async function handleCreateEvent(e) {
+    e.preventDefault();
+    
+    const eventData = {
+        nome: document.getElementById('eventNome').value,
+        data: document.getElementById('eventData').value,
+        luogo: document.getElementById('eventLuogo').value,
+        descrizione: document.getElementById('eventDescrizione').value
+    };
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(eventData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore nella creazione dell\'evento');
+        }
+        
+        eventForm.style.display = 'none';
+        createEventForm.reset();
+        await loadEventsAndPlaces();
+        alert('Evento creato con successo!');
+        
+    } catch (error) {
+        console.error('Error creating event:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+// Create Place
+async function handleCreatePlace(e) {
+    e.preventDefault();
+    
+    const placeData = {
+        nome: document.getElementById('placeNome').value,
+        categoria: document.getElementById('placeCategoria').value,
+        indirizzo: document.getElementById('placeIndirizzo').value,
+        descrizione: document.getElementById('placeDescrizione').value
+    };
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/places`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(placeData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore nella creazione del luogo');
+        }
+        
+        placeForm.style.display = 'none';
+        createPlaceForm.reset();
+        await loadEventsAndPlaces();
+        alert('Luogo creato con successo!');
+        
+    } catch (error) {
+        console.error('Error creating place:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+// Delete Event
+async function deleteEvent(eventId) {
+    if (!confirm('Sei sicuro di voler eliminare questo evento?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/events/${eventId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore nell\'eliminazione dell\'evento');
+        }
+        
+        await loadEventsAndPlaces();
+        alert('Evento eliminato con successo!');
+        
+    } catch (error) {
+        console.error('Error deleting event:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+// Delete Place
+async function deletePlace(placeId) {
+    if (!confirm('Sei sicuro di voler eliminare questo luogo?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/places/${placeId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore nell\'eliminazione del luogo');
+        }
+        
+        await loadEventsAndPlaces();
+        alert('Luogo eliminato con successo!');
+        
+    } catch (error) {
+        console.error('Error deleting place:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+// Edit Event
+let currentEditEvent = null;
+async function editEvent(eventId) {
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/events/${eventId}`);
+        if (!response.ok) throw new Error('Evento non trovato');
+        
+        const data = await response.json();
+        const event = data.event;
+        
+        currentEditEvent = eventId;
+        document.getElementById('editEventId').value = eventId;
+        document.getElementById('editEventNome').value = event.nome || '';
+        document.getElementById('editEventData').value = event.data || '';
+        document.getElementById('editEventLuogo').value = event.luogo || '';
+        document.getElementById('editEventDescrizione').value = event.descrizione || '';
+        
+        document.getElementById('editEventModal').style.display = 'flex';
+        
+    } catch (error) {
+        console.error('Error loading event:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+async function handleUpdateEvent(e) {
+    e.preventDefault();
+    
+    const eventId = document.getElementById('editEventId').value;
+    const updateData = {
+        event_id: eventId,
+        nome: document.getElementById('editEventNome').value,
+        data: document.getElementById('editEventData').value,
+        luogo: document.getElementById('editEventLuogo').value,
+        descrizione: document.getElementById('editEventDescrizione').value
+    };
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/events/${eventId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore nell\'aggiornamento');
+        }
+        
+        closeEditEventModal();
+        await loadEventsAndPlaces();
+        alert('Evento aggiornato con successo!');
+        
+    } catch (error) {
+        console.error('Error updating event:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+function closeEditEventModal() {
+    document.getElementById('editEventModal').style.display = 'none';
+    currentEditEvent = null;
+}
+
+// Edit Place
+let currentEditPlace = null;
+async function editPlace(placeId) {
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/places/${placeId}`);
+        if (!response.ok) throw new Error('Luogo non trovato');
+        
+        const data = await response.json();
+        const place = data.place;
+        
+        currentEditPlace = placeId;
+        document.getElementById('editPlaceId').value = placeId;
+        document.getElementById('editPlaceNome').value = place.nome || '';
+        document.getElementById('editPlaceCategoria').value = place.categoria || '';
+        document.getElementById('editPlaceIndirizzo').value = place.indirizzo || '';
+        document.getElementById('editPlaceDescrizione').value = place.descrizione || '';
+        
+        document.getElementById('editPlaceModal').style.display = 'flex';
+        
+    } catch (error) {
+        console.error('Error loading place:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+async function handleUpdatePlace(e) {
+    e.preventDefault();
+    
+    const placeId = document.getElementById('editPlaceId').value;
+    const updateData = {
+        place_id: placeId,
+        nome: document.getElementById('editPlaceNome').value,
+        categoria: document.getElementById('editPlaceCategoria').value,
+        indirizzo: document.getElementById('editPlaceIndirizzo').value,
+        descrizione: document.getElementById('editPlaceDescrizione').value
+    };
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/places/${placeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Errore nell\'aggiornamento');
+        }
+        
+        closeEditPlaceModal();
+        await loadEventsAndPlaces();
+        alert('Luogo aggiornato con successo!');
+        
+    } catch (error) {
+        console.error('Error updating place:', error);
+        alert(`Errore: ${error.message}`);
+    }
+}
+
+function closeEditPlaceModal() {
+    document.getElementById('editPlaceModal').style.display = 'none';
+    currentEditPlace = null;
+}
+
+// ========================================
+// AUTHENTICATION
+// ========================================
+
+function checkLoginStatus() {
+    if (!userPool) {
+        console.error('Cognito User Pool non configurato. Aggiorna CONFIG.COGNITO_USER_POOL_ID e CONFIG.COGNITO_CLIENT_ID');
+        loginError.textContent = 'Errore di configurazione. Contatta l\'amministratore.';
+        loginError.style.display = 'block';
+        return;
+    }
+
+    cognitoUser = userPool.getCurrentUser();
+    
+    if (cognitoUser != null) {
+        cognitoUser.getSession((err, session) => {
+            if (err) {
+                console.error('Session error:', err);
+                showLoginScreen();
+                return;
+            }
+            
+            if (session.isValid()) {
+                currentUser = cognitoUser.getUsername();
+                idToken = session.getIdToken().getJwtToken();
+                showMainApp();
+                
+                // Load data
+                loadGoals();
+                loadProjects();
+                loadContacts();
+                loadEventsAndPlaces();
+            } else {
+                showLoginScreen();
+            }
+        });
+    } else {
+        showLoginScreen();
+    }
+}
+
+function showLoginScreen() {
+    loginScreen.style.display = 'flex';
+    mainApp.style.display = 'none';
+}
+
+function showMainApp() {
+    loginScreen.style.display = 'none';
+    mainApp.style.display = 'flex';
+}
+
+function handleLogin(e) {
+    e.preventDefault();
+    
+    if (!userPool) {
+        loginError.textContent = 'Cognito non configurato';
+        loginError.style.display = 'block';
+        return;
+    }
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const loginBtn = document.getElementById('loginBtn');
+    
+    // Disable button and show loading
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Accesso in corso...';
+    loginError.style.display = 'none';
+    
+    const authenticationData = {
+        Username: username,
+        Password: password,
+    };
+    
+    const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails(authenticationData);
+    
+    const userData = {
+        Username: username,
+        Pool: userPool,
+    };
+    
+    cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+    
+    cognitoUser.authenticateUser(authenticationDetails, {
+        onSuccess: (result) => {
+            console.log('Login successful');
+            currentUser = username;
+            idToken = result.getIdToken().getJwtToken();
+            
+            // Clear form
+            loginForm.reset();
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Accedi';
+            
+            // Show main app
+            showMainApp();
+            
+            // Load data
+            loadGoals();
+            loadProjects();
+            loadContacts();
+            loadEventsAndPlaces();
+        },
+        
+        onFailure: (err) => {
+            console.error('Login failed:', err);
+            
+            // Re-enable button
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Accedi';
+            
+            // Show error message
+            let errorMessage = 'Errore di accesso';
+            
+            if (err.code === 'NotAuthorizedException') {
+                errorMessage = 'Username o password non corretti';
+            } else if (err.code === 'UserNotFoundException') {
+                errorMessage = 'Utente non trovato';
+            } else if (err.code === 'UserNotConfirmedException') {
+                errorMessage = 'Utente non confermato. Controlla la tua email.';
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+            
+            loginError.textContent = errorMessage;
+            loginError.style.display = 'block';
+            
+            // Shake animation
+            loginForm.style.animation = 'shake 0.5s';
+            setTimeout(() => {
+                loginForm.style.animation = '';
+            }, 500);
+        },
+        
+        newPasswordRequired: (userAttributes, requiredAttributes) => {
+            // Handle new password required (first login)
+            const newPassword = prompt('È necessario cambiare la password. Inserisci una nuova password:');
+            
+            if (newPassword) {
+                cognitoUser.completeNewPasswordChallenge(newPassword, {}, {
+                    onSuccess: (result) => {
+                        console.log('Password changed successfully');
+                        idToken = result.getIdToken().getJwtToken();
+                        showMainApp();
+                    },
+                    onFailure: (err) => {
+                        console.error('Password change failed:', err);
+                        loginError.textContent = 'Errore nel cambio password: ' + err.message;
+                        loginError.style.display = 'block';
+                        loginBtn.disabled = false;
+                        loginBtn.textContent = 'Accedi';
+                    }
+                });
+            } else {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Accedi';
+            }
+        }
+    });
+}
+
+function handleLogout() {
+    if (confirm('Sei sicuro di voler uscire?')) {
+        if (cognitoUser) {
+            cognitoUser.signOut();
+        }
+        
+        currentUser = null;
+        idToken = null;
+        cognitoUser = null;
+        
+        // Clear session data
+        sessionId = generateSessionId();
+        sessionIdDisplay.textContent = sessionId;
+        chatMessages.innerHTML = '';
+        
+        // Show login screen
+        showLoginScreen();
+    }
 }
 
 // ========================================
