@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aws-agentcore-backend
+    ports:
+      - "5000:5000"
+    environment:
+      # AWS Credentials (usa variabili d'ambiente o AWS CLI profile)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - AWS_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-east-1
+      # Flask configuration
+      - FLASK_ENV=production
+      - FLASK_APP=backend.py
+    restart: unless-stopped
+    networks:
+      - agentcore-network
+    volumes:
+      # Mount AWS credentials from host (opzionale se usi variabili d'ambiente)
+      - ~/.aws:/home/appuser/.aws:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  agentcore-network:
+    driver: bridge

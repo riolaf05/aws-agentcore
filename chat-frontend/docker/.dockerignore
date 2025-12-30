@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+docs/
+
+# Test files
+test_*.py
+*_test.py
+*.ipynb
+
+# Docker files (non servono nel container)
+docker/
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Project structure (non necessari per il backend)
+agents/
+lambdas/
+infrastructure/
+mcp-server/
+scripts/
+shared/
+config/
+
+# Frontend build artifacts
+node_modules/
+package*.json
+*.map
+
+# Development files
+*.example
+.env.example
+LICENSE
+QUICKSTART.md
