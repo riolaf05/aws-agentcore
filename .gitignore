@@ -73,3 +73,18 @@ credentials.json
 
 # OS
 Thumbs.db
+
+# Node.js
+node_modules/
+*.tgz
+npm-debug.log*
+
+# Docker
+*.tar
+*.img
+*.container
+
+# WebSocket agent (output, temp)
+agents/websockert-agent/*.log
+agents/websockert-agent/.env
+agents/websockert-agent/node_modules/
