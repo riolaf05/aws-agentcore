@@ -49,6 +49,7 @@ def lambda_handler(event, context):
     dove_conosciuto = body.get('dove_conosciuto', '')
     note = body.get('note', '')
     url = body.get('url', '')
+    tipo = body.get('tipo', '')  # Campo libero per il tipo di contatto
     
     # Genera ID univoco
     contact_id = str(uuid.uuid4())
@@ -65,6 +66,7 @@ def lambda_handler(event, context):
         'dove_conosciuto': dove_conosciuto,
         'note': note,
         'url': url,
+        'tipo': tipo,
         'created_at': timestamp,
         'updated_at': timestamp
     }

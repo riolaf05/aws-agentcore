@@ -78,6 +78,7 @@ const contactsList = document.getElementById('contactsList');
 const refreshContactsBtn = document.getElementById('refreshContactsBtn');
 const contactFilterNome = document.getElementById('contactFilterNome');
 const contactFilterCognome = document.getElementById('contactFilterCognome');
+const contactFilterTipo = document.getElementById('contactFilterTipo');
 const contactFilterDove = document.getElementById('contactFilterDove');
 
 // Elementi DOM - Events & Places
@@ -160,6 +161,7 @@ function init() {
     refreshContactsBtn.addEventListener('click', loadContacts);
     contactFilterNome.addEventListener('input', loadContacts);
     contactFilterCognome.addEventListener('input', loadContacts);
+    contactFilterTipo.addEventListener('input', loadContacts);
     contactFilterDove.addEventListener('input', loadContacts);
     
     // Contact sort listener
@@ -1017,11 +1019,13 @@ async function loadContacts() {
         // Recupera filtri
         const nomeFilter = document.getElementById('contactFilterNome')?.value || '';
         const cognomeFilter = document.getElementById('contactFilterCognome')?.value || '';
+        const tipoFilter = document.getElementById('contactFilterTipo')?.value || '';
         const doveFilter = document.getElementById('contactFilterDove')?.value || '';
         
         const params = new URLSearchParams();
         if (nomeFilter) params.append('nome', nomeFilter);
         if (cognomeFilter) params.append('cognome', cognomeFilter);
+        if (tipoFilter) params.append('tipo', tipoFilter);
         if (doveFilter) params.append('dove_conosciuto', doveFilter);
         
         const url = `${CONFIG.API_URL}/contacts${params.toString() ? '?' + params.toString() : ''}`;
@@ -1066,7 +1070,6 @@ function displayContacts(contacts) {
     
     contactsList.innerHTML = sortedContacts.map(contact => {
         const displayName = escapeHtml([contact.nome, contact.cognome].filter(Boolean).join(' ') || 'Senza nome');
-        
         return `
         <div class="item-card">
             <div class="item-header" style="cursor: pointer;" onclick="toggleContactDetails('${contact.contact_id}')">
@@ -1074,6 +1077,7 @@ function displayContacts(contacts) {
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span class="expand-icon" id="expand-${contact.contact_id}">▶</span>
                         <h3 class="item-title" style="margin: 0;">${displayName}</h3>
+                        ${contact.tipo ? `<span class='badge badge-tipo'>${escapeHtml(contact.tipo)}</span>` : ''}
                     </div>
                     <div style="margin-left: 24px; margin-top: 4px;">
                         ${contact.email ? `<a href="mailto:${escapeHtml(contact.email)}" class="item-link" onclick="event.stopPropagation();"><strong>${escapeHtml(contact.email)}</strong></a>` : ''}
@@ -1083,11 +1087,15 @@ function displayContacts(contacts) {
                 </div>
                 ${contact.dove_conosciuto ? `<span class="badge badge-ambito">${escapeHtml(contact.dove_conosciuto)}</span>` : ''}
             </div>
-            
             <div class="contact-details" id="details-${contact.contact_id}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;">
                 ${contact.descrizione ? `<div class="item-description" style="margin-top: 12px;">${formatDescription(contact.descrizione)}</div>` : ''}
-                
                 <div class="item-details" style="margin-top: 12px;">
+                    ${contact.tipo ? `
+                    <div class="item-detail">
+                        <span class="item-detail-label">Tipo</span>
+                        <span class="item-detail-value">${escapeHtml(contact.tipo)}</span>
+                    </div>
+                    ` : ''}
                     ${contact.url ? `
                     <div class="item-detail">
                         <span class="item-detail-label">URL</span>
@@ -1105,7 +1113,6 @@ function displayContacts(contacts) {
                     </div>
                     ` : ''}
                 </div>
-                
                 ${contact.note ? `
                 <div class="item-details" style="margin-top: 12px;">
                     <div class="item-detail" style="grid-column: 1/-1;">
@@ -1114,14 +1121,13 @@ function displayContacts(contacts) {
                     </div>
                 </div>
                 ` : ''}
-                
                 <div class="item-actions" style="margin-top: 12px;">
                     <button class="btn-edit" onclick="event.stopPropagation(); editContact('${contact.contact_id}')">✏️ Modifica</button>
                     <button class="btn-delete" onclick="event.stopPropagation(); deleteContact('${contact.contact_id}', '${displayName.replace(/'/g, "\\'")}')">🗑️ Elimina</button>
                 </div>
             </div>
         </div>
-    `;
+        `;
     }).join('');
 }
 
@@ -1170,6 +1176,7 @@ async function handleCreateContact(e) {
         email: document.getElementById('contactEmail').value.trim(),
         telefono: document.getElementById('contactTelefono').value.trim(),
         descrizione: document.getElementById('contactDescrizione').value.trim(),
+        tipo: document.getElementById('contactTipo').value.trim(),
         dove_conosciuto: document.getElementById('contactDoveConosciuto').value.trim(),
         note: document.getElementById('contactNote').value.trim(),
         url: document.getElementById('contactUrl').value.trim()
@@ -1280,6 +1287,7 @@ async function handleUpdateContact(e) {
         email: document.getElementById('editContactEmail').value.trim(),
         telefono: document.getElementById('editContactTelefono').value.trim(),
         descrizione: document.getElementById('editContactDescrizione').value.trim(),
+        tipo: document.getElementById('editContactTipo').value.trim(),
         dove_conosciuto: document.getElementById('editContactDoveConosciuto').value.trim(),
         note: document.getElementById('editContactNote').value.trim(),
         url: document.getElementById('editContactUrl').value.trim()

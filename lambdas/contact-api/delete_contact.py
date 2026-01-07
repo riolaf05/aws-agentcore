@@ -64,7 +64,8 @@ def lambda_handler(event, context):
                 'deleted_contact': {
                     'nome': contact.get('nome', ''),
                     'cognome': contact.get('cognome', ''),
-                    'email': contact.get('email', '')
+                    'email': contact.get('email', ''),
+                    'tipo': contact.get('tipo', '')
                 },
                 'timestamp': datetime.utcnow().isoformat()
             }, cls=DecimalEncoder)

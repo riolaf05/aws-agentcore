@@ -41,7 +41,11 @@ agentcore gateway create-mcp-gateway-target `
               "descrizione": {"type": "string", "description": "Ruolo o descrizione (es. CEO di TechCompany)"},
               "dove_conosciuto": {"type": "string", "description": "Dove/quando hai conosciuto la persona"},
               "note": {"type": "string", "description": "Note aggiuntive"},
-              "url": {"type": "string", "description": "URL LinkedIn o altro profilo social"}
+              "url": {"type": "string", "description": "URL LinkedIn o altro profilo social"},
+              "tipo": {
+                "description": "Tipo di contatto (investitore, startupper, fornitore, etc.)",
+                "type": "string"
+              }
             }
           }
         }]
@@ -108,7 +112,11 @@ agentcore gateway create-mcp-gateway-target `
               "descrizione": {"type": "string", "description": "Nuova descrizione"},
               "dove_conosciuto": {"type": "string", "description": "Aggiorna dove conosciuto"},
               "note": {"type": "string", "description": "Nuove note"},
-              "url": {"type": "string", "description": "Nuovo URL"}
+              "url": {"type": "string", "description": "Nuovo URL"},
+              "tipo": {
+                "description": "Tipo di contatto (investitore, startupper, fornitore, etc.)",
+                "type": "string"
+              }
             },
             "required": ["contact_id"]
           }

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personal Assistant</title>
+    <title>Personal Copilot</title>
+    <link rel="icon" type="image/svg+xml" href="favicon-robot.svg">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="modal-styles.css">
     <!-- AWS Cognito SDK -->
@@ -14,7 +15,7 @@
     <div id="loginScreen" class="login-screen">
         <div class="login-container">
             <div class="login-header">
-                <h1>🤖 Personal Assistant</h1>
+                <h1>🤖 Personal Copilot</h1>
                 <p>Effettua il login per accedere</p>
             </div>
             <form id="loginForm" class="login-form">
@@ -293,6 +294,10 @@
                             <textarea id="contactDescrizione" rows="3" placeholder="Breve descrizione del contatto..."></textarea>
                         </div>
                         <div class="form-group">
+                            <label for="contactTipo">Tipo</label>
+                            <input type="text" id="contactTipo" placeholder="es. startup, investitore, fornitore, ...">
+                        </div>
+                        <div class="form-group">
                             <label for="contactDoveConosciuto">Dove Conosciuto</label>
                             <input type="text" id="contactDoveConosciuto" placeholder="es. Conferenza Tech, LinkedIn, Università">
                         </div>
@@ -315,6 +320,7 @@
                 <div class="filters-container">
                     <input type="text" id="contactFilterNome" placeholder="Filtra per nome...">
                     <input type="text" id="contactFilterCognome" placeholder="Filtra per cognome...">
+                    <input type="text" id="contactFilterTipo" placeholder="Filtra per tipo...">
                     <input type="text" id="contactFilterDove" placeholder="Filtra per dove conosciuto...">
                     <select id="contactSortOrder" class="secondary-btn" style="min-width: 200px;">
                         <option value="date-desc">📅 Più recenti</option>
@@ -582,6 +588,10 @@
                 <div class="form-group">
                     <label for="editContactDescrizione">Descrizione</label>
                     <textarea id="editContactDescrizione" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editContactTipo">Tipo</label>
+                    <input type="text" id="editContactTipo">
                 </div>
                 <div class="form-group">
                     <label for="editContactDoveConosciuto">Dove Conosciuto</label>

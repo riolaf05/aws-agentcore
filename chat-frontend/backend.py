@@ -1031,7 +1031,7 @@ def update_place(place_id):
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("🚀 Personal Assistant Backend Server")
+    print("🚀 Personal Copilot Backend Server")
     print("=" * 60)
     print(f"Orchestrator ARN: {ORCHESTRATOR_ARN}")
     print(f"Region: {REGION}")

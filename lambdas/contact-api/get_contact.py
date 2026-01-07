@@ -40,6 +40,7 @@ def lambda_handler(event, context):
     cognome = params.get('cognome')
     email = params.get('email')
     dove_conosciuto = params.get('dove_conosciuto')
+    tipo = params.get('tipo')
     contact_id = params.get('contact_id')
     limit = int(params.get('limit', 100))
     
@@ -69,19 +70,16 @@ def lambda_handler(event, context):
         
         # Costruisci espressione di filtro
         filter_expressions = []
-        
         if nome:
             filter_expressions.append(Attr('nome').contains(nome))
-        
         if cognome:
             filter_expressions.append(Attr('cognome').contains(cognome))
-        
         if email:
             filter_expressions.append(Attr('email').contains(email))
-        
         if dove_conosciuto:
             filter_expressions.append(Attr('dove_conosciuto').contains(dove_conosciuto))
-        
+        if tipo:
+            filter_expressions.append(Attr('tipo').contains(tipo))
         # Applica filtri se presenti
         if filter_expressions:
             filter_expr = filter_expressions[0]
@@ -107,7 +105,8 @@ def lambda_handler(event, context):
                     'nome': nome,
                     'cognome': cognome,
                     'email': email,
-                    'dove_conosciuto': dove_conosciuto
+                    'dove_conosciuto': dove_conosciuto,
+                    'tipo': tipo
                 }
             }, default=decimal_default)
         }

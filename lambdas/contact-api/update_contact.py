@@ -59,7 +59,7 @@ def lambda_handler(event, context):
         # All fields are updatable
         updatable_fields = [
             'nome', 'cognome', 'email', 'telefono', 
-            'descrizione', 'dove_conosciuto', 'note', 'url'
+            'descrizione', 'dove_conosciuto', 'note', 'url', 'tipo'
         ]
         
         for field in updatable_fields:

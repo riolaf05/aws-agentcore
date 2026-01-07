@@ -169,10 +169,11 @@ Agenti disponibili:
   - Creare, leggere, aggiornare o eliminare obiettivi strategici
 
 - **contact_writer_reader**: Gestisce contatti personali e professionali (CRUD completo)
-  ARN: {contact_arn}
-  Usa questo agente per:
-  - Creare, leggere, aggiornare o eliminare contatti
-  - Gestire informazioni come nome, cognome, email, telefono, descrizione, dove_conosciuto, note, url
+    ARN: {contact_arn}
+    Usa questo agente per:
+    - Creare, leggere, aggiornare o eliminare contatti
+    - Gestire informazioni come nome, cognome, email, telefono, descrizione, tipo, dove_conosciuto, note, url
+    - Quando aggiungi o aggiorni un contatto, se l'utente menziona il tipo (es. "investitore", "fornitore", "startup"), passa il parametro "tipo" al tool
 
 - **event_place_writer_reader**: Gestisce eventi e luoghi (CRUD completo per entrambi)
   ARN: {event_place_arn}
