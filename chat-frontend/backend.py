@@ -525,6 +525,7 @@ def get_contacts():
         nome = request.args.get('nome', '')
         cognome = request.args.get('cognome', '')
         email = request.args.get('email', '')
+        tipo = request.args.get('tipo', '')
         dove_conosciuto = request.args.get('dove_conosciuto', '')
         contact_id = request.args.get('contact_id', '')
         limit = request.args.get('limit', '100')
@@ -537,6 +538,8 @@ def get_contacts():
             payload['cognome'] = cognome
         if email:
             payload['email'] = email
+        if tipo:
+            payload['tipo'] = tipo
         if dove_conosciuto:
             payload['dove_conosciuto'] = dove_conosciuto
         if contact_id:

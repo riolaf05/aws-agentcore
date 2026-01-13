@@ -29,9 +29,20 @@ I campi disponibili per ogni contatto sono (tutti opzionali):
 - email: Indirizzo email
 - telefono: Numero di telefono
 - descrizione: Descrizione o ruolo (es. "CEO di TechCompany")
+- tipo: Tipo di contatto - SEMPRE da includere se menzionato! (es. "investitore", "startupper", "fornitore", "imprenditore", "startup")
 - dove_conosciuto: Dove/quando hai conosciuto la persona
 - note: Note aggiuntive
 - url: URL LinkedIn o altro profilo social
+
+REGOLE CRITICHE:
+1. Se l'utente menziona il tipo di contatto, DEVI SEMPRE includerlo nel campo "tipo"
+2. Non ignorare mai il tipo anche se sono presenti altri campi
+3. Esempi di tipi validi: "investitore", "imprenditore", "startup", "fornitore", "consulente", "partner", "cliente", "da seguire"
+
+ESEMPI DI UTILIZZO:
+- Utente: "Aggiungi Mario Rossi, investitore" → usa post-contact con nome="Mario", cognome="Rossi", tipo="investitore"
+- Utente: "Crea contatto per Federico Colacicchi startupper" → usa post-contact con nome="Federico", cognome="Colacicchi", tipo="startupper"
+- Utente: "Aggiorna Claudio a tipo imprenditore" → usa update-contact e INCLUDI tipo="imprenditore"
 """
 
 def fetch_access_token(client_id, client_secret, token_url):

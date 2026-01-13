@@ -8,13 +8,9 @@ services:
     container_name: aws-agentcore-backend
     ports:
       - "5000:5000"
+    env_file:
+      - ../../.env
     environment:
-      # AWS Credentials (usa variabili d'ambiente o AWS CLI profile)
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-      - AWS_REGION=us-east-1
-      - AWS_DEFAULT_REGION=us-east-1
       # Flask configuration
       - FLASK_ENV=production
       - FLASK_APP=backend.py

@@ -76,10 +76,7 @@ const createContactForm = document.getElementById('createContactForm');
 const cancelContactBtn = document.getElementById('cancelContactBtn');
 const contactsList = document.getElementById('contactsList');
 const refreshContactsBtn = document.getElementById('refreshContactsBtn');
-const contactFilterNome = document.getElementById('contactFilterNome');
-const contactFilterCognome = document.getElementById('contactFilterCognome');
 const contactFilterTipo = document.getElementById('contactFilterTipo');
-const contactFilterDove = document.getElementById('contactFilterDove');
 
 // Elementi DOM - Events & Places
 const newEventBtn = document.getElementById('newEventBtn');
@@ -159,10 +156,7 @@ function init() {
     });
     createContactForm.addEventListener('submit', handleCreateContact);
     refreshContactsBtn.addEventListener('click', loadContacts);
-    contactFilterNome.addEventListener('input', loadContacts);
-    contactFilterCognome.addEventListener('input', loadContacts);
     contactFilterTipo.addEventListener('input', loadContacts);
-    contactFilterDove.addEventListener('input', loadContacts);
     
     // Contact sort listener
     const contactSortOrder = document.getElementById('contactSortOrder');
@@ -1017,16 +1011,10 @@ async function loadContacts() {
     
     try {
         // Recupera filtri
-        const nomeFilter = document.getElementById('contactFilterNome')?.value || '';
-        const cognomeFilter = document.getElementById('contactFilterCognome')?.value || '';
         const tipoFilter = document.getElementById('contactFilterTipo')?.value || '';
-        const doveFilter = document.getElementById('contactFilterDove')?.value || '';
         
         const params = new URLSearchParams();
-        if (nomeFilter) params.append('nome', nomeFilter);
-        if (cognomeFilter) params.append('cognome', cognomeFilter);
         if (tipoFilter) params.append('tipo', tipoFilter);
-        if (doveFilter) params.append('dove_conosciuto', doveFilter);
         
         const url = `${CONFIG.API_URL}/contacts${params.toString() ? '?' + params.toString() : ''}`;
         const response = await fetch(url);
@@ -1044,7 +1032,7 @@ async function loadContacts() {
     }
 }
 
-let currentContactSort = 'date-desc';
+let currentContactSort = 'name-asc';
 
 function displayContacts(contacts) {
     const contactsList = document.getElementById('contactsList');
@@ -1068,67 +1056,105 @@ function displayContacts(contacts) {
     // Applica ordinamento
     const sortedContacts = sortContacts([...contacts], currentContactSort);
     
-    contactsList.innerHTML = sortedContacts.map(contact => {
-        const displayName = escapeHtml([contact.nome, contact.cognome].filter(Boolean).join(' ') || 'Senza nome');
-        return `
-        <div class="item-card">
-            <div class="item-header" style="cursor: pointer;" onclick="toggleContactDetails('${contact.contact_id}')">
-                <div style="flex: 1;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="expand-icon" id="expand-${contact.contact_id}">▶</span>
-                        <h3 class="item-title" style="margin: 0;">${displayName}</h3>
-                        ${contact.tipo ? `<span class='badge badge-tipo'>${escapeHtml(contact.tipo)}</span>` : ''}
-                    </div>
-                    <div style="margin-left: 24px; margin-top: 4px;">
-                        ${contact.email ? `<a href="mailto:${escapeHtml(contact.email)}" class="item-link" onclick="event.stopPropagation();"><strong>${escapeHtml(contact.email)}</strong></a>` : ''}
-                        ${contact.email && contact.telefono ? ' • ' : ''}
-                        ${contact.telefono ? `<a href="tel:${escapeHtml(contact.telefono)}" class="item-link" onclick="event.stopPropagation();"><strong>${escapeHtml(contact.telefono)}</strong></a>` : ''}
-                    </div>
-                </div>
-                ${contact.dove_conosciuto ? `<span class="badge badge-ambito">${escapeHtml(contact.dove_conosciuto)}</span>` : ''}
-            </div>
-            <div class="contact-details" id="details-${contact.contact_id}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;">
-                ${contact.descrizione ? `<div class="item-description" style="margin-top: 12px;">${formatDescription(contact.descrizione)}</div>` : ''}
-                <div class="item-details" style="margin-top: 12px;">
-                    ${contact.tipo ? `
-                    <div class="item-detail">
-                        <span class="item-detail-label">Tipo</span>
-                        <span class="item-detail-value">${escapeHtml(contact.tipo)}</span>
-                    </div>
-                    ` : ''}
-                    ${contact.url ? `
-                    <div class="item-detail">
-                        <span class="item-detail-label">URL</span>
-                        <a href="${escapeHtml(contact.url)}" target="_blank" class="item-link"><strong>${escapeHtml(contact.url)}</strong></a>
-                    </div>
-                    ` : ''}
-                    <div class="item-detail">
-                        <span class="item-detail-label">Creato</span>
-                        <span class="item-detail-value">${formatDateTime(contact.created_at)}</span>
-                    </div>
-                    ${contact.updated_at && contact.updated_at !== contact.created_at ? `
-                    <div class="item-detail">
-                        <span class="item-detail-label">Aggiornato</span>
-                        <span class="item-detail-value">${formatDateTime(contact.updated_at)}</span>
-                    </div>
-                    ` : ''}
-                </div>
-                ${contact.note ? `
-                <div class="item-details" style="margin-top: 12px;">
-                    <div class="item-detail" style="grid-column: 1/-1;">
-                        <span class="item-detail-label">Note</span>
-                        <div class="item-description">${formatDescription(contact.note)}</div>
-                    </div>
-                </div>
-                ` : ''}
-                <div class="item-actions" style="margin-top: 12px;">
-                    <button class="btn-edit" onclick="event.stopPropagation(); editContact('${contact.contact_id}')">✏️ Modifica</button>
-                    <button class="btn-delete" onclick="event.stopPropagation(); deleteContact('${contact.contact_id}', '${displayName.replace(/'/g, "\\'")}')">🗑️ Elimina</button>
-                </div>
-            </div>
-        </div>
-        `;
-    }).join('');
+    // Crea tabella
+    contactsList.innerHTML = `
+        <table class="contacts-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;"></th>
+                    <th style="width: 30%;">Nome</th>
+                    <th style="width: 20%;">Tipo</th>
+                    <th style="width: 50%;">Note</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sortedContacts.map(contact => {
+                    const displayName = escapeHtml([contact.nome, contact.cognome].filter(Boolean).join(' ') || 'Senza nome');
+                    const notePreview = contact.note ? escapeHtml(contact.note.substring(0, 100)) + (contact.note.length > 100 ? '...' : '') : '-';
+                    return `
+                        <tr class="contact-row" data-contact-id="${contact.contact_id}">
+                            <td class="expand-cell">
+                                <span class="expand-icon" id="expand-${contact.contact_id}">▶</span>
+                            </td>
+                            <td class="contact-name">
+                                <strong>${displayName}</strong>
+                            </td>
+                            <td>
+                                ${contact.tipo ? `<span class="badge badge-tipo">${escapeHtml(contact.tipo)}</span>` : '-'}
+                            </td>
+                            <td class="contact-notes">${notePreview}</td>
+                        </tr>
+                        <tr class="contact-details-row" id="details-row-${contact.contact_id}" style="display: none;">
+                            <td colspan="4">
+                                <div class="contact-details-content">
+                                    <div class="details-grid">
+                                        ${contact.email ? `
+                                        <div class="detail-item">
+                                            <span class="detail-label">📧 Email:</span>
+                                            <a href="mailto:${escapeHtml(contact.email)}" class="item-link">${escapeHtml(contact.email)}</a>
+                                        </div>
+                                        ` : ''}
+                                        ${contact.telefono ? `
+                                        <div class="detail-item">
+                                            <span class="detail-label">📱 Telefono:</span>
+                                            <a href="tel:${escapeHtml(contact.telefono)}" class="item-link">${escapeHtml(contact.telefono)}</a>
+                                        </div>
+                                        ` : ''}
+                                        ${contact.dove_conosciuto ? `
+                                        <div class="detail-item">
+                                            <span class="detail-label">📍 Dove Conosciuto:</span>
+                                            <span>${escapeHtml(contact.dove_conosciuto)}</span>
+                                        </div>
+                                        ` : ''}
+                                        ${contact.url ? `
+                                        <div class="detail-item">
+                                            <span class="detail-label">🔗 URL:</span>
+                                            <a href="${escapeHtml(contact.url)}" target="_blank" class="item-link">${escapeHtml(contact.url)}</a>
+                                        </div>
+                                        ` : ''}
+                                        <div class="detail-item">
+                                            <span class="detail-label">📅 Creato:</span>
+                                            <span>${formatDateTime(contact.created_at)}</span>
+                                        </div>
+                                        ${contact.updated_at && contact.updated_at !== contact.created_at ? `
+                                        <div class="detail-item">
+                                            <span class="detail-label">🔄 Aggiornato:</span>
+                                            <span>${formatDateTime(contact.updated_at)}</span>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                    ${contact.descrizione ? `
+                                    <div class="detail-section">
+                                        <span class="detail-label">📝 Descrizione:</span>
+                                        <div class="item-description">${formatDescription(contact.descrizione)}</div>
+                                    </div>
+                                    ` : ''}
+                                    ${contact.note ? `
+                                    <div class="detail-section">
+                                        <span class="detail-label">📄 Note Complete:</span>
+                                        <div class="item-description">${formatDescription(contact.note)}</div>
+                                    </div>
+                                    ` : ''}
+                                    <div class="detail-actions">
+                                        <button class="btn-edit" onclick="editContact('${contact.contact_id}')">✏️ Modifica</button>
+                                        <button class="btn-delete" onclick="deleteContact('${contact.contact_id}', '${displayName.replace(/'/g, "\\'")}')">🗑️ Elimina</button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+    
+    // Aggiungi event listeners per espandere/comprimere
+    document.querySelectorAll('.contact-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const contactId = this.dataset.contactId;
+            toggleContactDetails(contactId);
+        });
+    });
 }
 
 function sortContacts(contacts, sortOrder) {
@@ -1155,14 +1181,14 @@ function sortContacts(contacts, sortOrder) {
 }
 
 function toggleContactDetails(contactId) {
-    const detailsDiv = document.getElementById(`details-${contactId}`);
+    const detailsRow = document.getElementById(`details-row-${contactId}`);
     const expandIcon = document.getElementById(`expand-${contactId}`);
     
-    if (detailsDiv.style.maxHeight === '0px' || !detailsDiv.style.maxHeight) {
-        detailsDiv.style.maxHeight = detailsDiv.scrollHeight + 'px';
+    if (detailsRow.style.display === 'none' || !detailsRow.style.display) {
+        detailsRow.style.display = 'table-row';
         expandIcon.textContent = '▼';
     } else {
-        detailsDiv.style.maxHeight = '0';
+        detailsRow.style.display = 'none';
         expandIcon.textContent = '▶';
     }
 }
@@ -1238,6 +1264,7 @@ async function editContact(contactId) {
         document.getElementById('editContactEmail').value = contact.email || '';
         document.getElementById('editContactTelefono').value = contact.telefono || '';
         document.getElementById('editContactDescrizione').value = contact.descrizione || '';
+        document.getElementById('editContactTipo').value = contact.tipo || '';
         document.getElementById('editContactDoveConosciuto').value = contact.dove_conosciuto || '';
         document.getElementById('editContactNote').value = contact.note || '';
         document.getElementById('editContactUrl').value = contact.url || '';

@@ -318,21 +318,18 @@
 
                 <!-- Contacts Filters -->
                 <div class="filters-container">
-                    <input type="text" id="contactFilterNome" placeholder="Filtra per nome...">
-                    <input type="text" id="contactFilterCognome" placeholder="Filtra per cognome...">
                     <input type="text" id="contactFilterTipo" placeholder="Filtra per tipo...">
-                    <input type="text" id="contactFilterDove" placeholder="Filtra per dove conosciuto...">
                     <select id="contactSortOrder" class="secondary-btn" style="min-width: 200px;">
-                        <option value="date-desc">📅 Più recenti</option>
-                        <option value="date-asc">📅 Più vecchi</option>
                         <option value="name-asc">🔤 Nome A-Z</option>
                         <option value="name-desc">🔤 Nome Z-A</option>
+                        <option value="date-desc">📅 Più recenti</option>
+                        <option value="date-asc">📅 Più vecchi</option>
                     </select>
                     <button id="refreshContactsBtn" class="secondary-btn">🔄 Aggiorna</button>
                 </div>
 
-                <!-- Contacts List -->
-                <div id="contactsList" class="items-list">
+                <!-- Contacts Table -->
+                <div id="contactsList" class="contacts-table-container">
                     <p class="loading">Caricamento contatti...</p>
                 </div>
             </div>
