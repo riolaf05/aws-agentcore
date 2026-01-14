@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Copilot</title>
+    <link rel="icon" type="image/svg+xml" href="favicon-robot.svg">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="modal-styles.css">
+    <!-- AWS Cognito SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🤖 Personal Copilot</h1>
+                <p>Effettua il login per accedere</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username o Email</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+                <div id="loginError" class="login-error" style="display: none;"></div>
+                <button type="submit" class="login-btn" id="loginBtn">Accedi</button>
+            </form>
+            <div class="login-footer">
+                <p>Contatta l'amministratore per ottenere le credenziali</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application (hidden until login) -->
+    <div id="mainApp" style="display: none;">
+    <!-- Sidebar Menu -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>📋 Menu</h2>
+            <button id="logoutBtn" class="logout-btn" title="Logout">🚪</button>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-view="chat">
+                <span class="nav-icon">💬</span>
+                <span class="nav-text">Chat</span>
+            </a>
+            <a href="#" class="nav-item" data-view="goals">
+                <span class="nav-icon">🎯</span>
+                <span class="nav-text">Obiettivi</span>
+            </a>
+            <a href="#" class="nav-item" data-view="projects">
+                <span class="nav-icon">💼</span>
+                <span class="nav-text">Progetti</span>
+            </a>
+            <a href="#" class="nav-item" data-view="contacts">
+                <span class="nav-icon">👤</span>
+                <span class="nav-text">Contatti</span>
+            </a>
+            <a href="#" class="nav-item" data-view="events">
+                <span class="nav-icon">📍</span>
+                <span class="nav-text">Eventi&Luoghi</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Chat View -->
+        <div id="chatView" class="view active">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <h1>🤖 Orchestrator AI</h1>
+                    <div class="status">
+                        <span id="status-indicator" class="status-dot disconnected"></span>
+                        <span id="status-text">Disconnesso</span>
+                    </div>
+                </div>
+
+                <div class="chat-messages" id="chatMessages">
+                    <div class="system-message">
+                        Benvenuto! Sono l'Orchestrator AI. Posso aiutarti a:
+                        <ul>
+                            <li>📝 Creare e gestire task</li>
+                            <li>🎯 Gestire obiettivi strategici</li>
+                            <li>💼 Organizzare progetti</li>
+                            <li>🔍 Cercare informazioni online</li>
+                            <li>🧮 Eseguire calcoli matematici</li>
+                        </ul>
+                        Scrivi un messaggio per iniziare!
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Scrivi un messaggio..."
+                        autocomplete="off"
+                    >
+                    <button id="sendButton">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="chat-info">
+                    <small>Session ID: <span id="sessionId"></span></small>
+                    <button id="newSessionButton" class="new-session-btn">Nuova Sessione</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Goals View -->
+        <div id="goalsView" class="view">
+            <div class="section-container">
+                <div class="section-header">
+                    <h1>🎯 Obiettivi Strategici</h1>
+                    <button id="newGoalBtn" class="primary-btn">+ Nuovo Obiettivo</button>
+                </div>
+
+                <!-- Goals Form (hidden by default) -->
+                <div id="goalForm" class="form-container" style="display: none;">
+                    <h2>Crea Nuovo Obiettivo</h2>
+                    <form id="createGoalForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="goalAmbito">Ambito *</label>
+                                <input type="text" id="goalAmbito" placeholder="es. Reply, MatchGuru" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="goalPriorita">Priorità *</label>
+                                <select id="goalPriorita" required>
+                                    <option value="low">Bassa</option>
+                                    <option value="medium" selected>Media</option>
+                                    <option value="high">Alta</option>
+                                    <option value="urgent">Urgente</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="goalTitolo">Titolo *</label>
+                            <input type="text" id="goalTitolo" placeholder="es. Aumentare fatturato Q1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="goalDescrizione">Descrizione</label>
+                            <textarea id="goalDescrizione" rows="3" placeholder="Descrizione dettagliata dell'obiettivo..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="goalScadenza">Scadenza *</label>
+                            <input type="date" id="goalScadenza" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="goalMetriche">Metriche (JSON)</label>
+                            <textarea id="goalMetriche" rows="2" placeholder='{"completamento_percentuale": 0, "target": 100}'></textarea>
+                            <small>Formato: {"chiave": valore, ...}</small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Salva Obiettivo</button>
+                            <button type="button" id="cancelGoalBtn" class="secondary-btn">Annulla</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Goals Filters -->
+                <div class="filters-container">
+                    <input type="text" id="goalFilterAmbito" placeholder="Filtra per ambito...">
+                    <select id="goalFilterStatus">
+                        <option value="">Tutti gli stati</option>
+                        <option value="active" selected>Attivi</option>
+                        <option value="completed">Completati</option>
+                        <option value="cancelled">Cancellati</option>
+                    </select>
+                    <select id="goalFilterPriorita">
+                        <option value="">Tutte le priorità</option>
+                        <option value="urgent">Urgente</option>
+                        <option value="high">Alta</option>
+                        <option value="medium">Media</option>
+                        <option value="low">Bassa</option>
+                    </select>
+                    <button id="refreshGoalsBtn" class="secondary-btn">🔄 Aggiorna</button>
+                </div>
+
+                <!-- Goals List -->
+                <div id="goalsList" class="items-list">
+                    <p class="loading">Caricamento obiettivi...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects View -->
+        <div id="projectsView" class="view">
+            <div class="section-container">
+                <div class="section-header">
+                    <div>
+                        <h1>💼 Progetti</h1>
+                        <div class="counter-badge">
+                            <span id="projectsCounter">0</span> progetti caricati
+                        </div>
+                    </div>
+                    <button id="newProjectBtn" class="primary-btn">+ Nuovo Progetto</button>
+                </div>
+
+                <!-- Projects Form (hidden by default) -->
+                <div id="projectForm" class="form-container" style="display: none;">
+                    <h2>Crea Nuovo Progetto</h2>
+                    <form id="createProjectForm">
+                        <div class="form-group">
+                            <label for="projectAmbito">Ambito *</label>
+                            <input type="text" id="projectAmbito" placeholder="es. Reply, MatchGuru" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="projectTitolo">Titolo *</label>
+                            <input type="text" id="projectTitolo" placeholder="es. Sistema Analytics Real-time" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="projectGithubUrl">GitHub URL</label>
+                            <input type="url" id="projectGithubUrl" placeholder="https://github.com/user/repo">
+                        </div>
+                        <div class="form-group">
+                            <label for="projectDescrizione">Descrizione</label>
+                            <textarea id="projectDescrizione" rows="4" placeholder="Descrizione dettagliata del progetto..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="projectTag">Tecnologie/Tag</label>
+                            <input type="text" id="projectTag" placeholder="Python, AWS, React (separati da virgola)">
+                            <small>Inserisci le tecnologie separate da virgola</small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Salva Progetto</button>
+                            <button type="button" id="cancelProjectBtn" class="secondary-btn">Annulla</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Projects Filters -->
+                <div class="filters-container">
+                    <input type="text" id="projectFilterAmbito" placeholder="Filtra per ambito...">
+                    <input type="text" id="projectFilterTag" placeholder="Filtra per tecnologia...">
+                    <button id="refreshProjectsBtn" class="secondary-btn">🔄 Aggiorna</button>
+                </div>
+
+                <!-- Projects List -->
+                <div id="projectsList" class="items-list">
+                    <p class="loading">Caricamento progetti...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contacts View -->
+        <div id="contactsView" class="view">
+            <div class="section-container">
+                <div class="section-header">
+                    <div>
+                        <h1>👤 Contatti</h1>
+                        <div class="counter-badge">
+                            <span id="contactsCounter">0</span> contatti caricati
+                        </div>
+                    </div>
+                    <button id="newContactBtn" class="primary-btn">+ Nuovo Contatto</button>
+                </div>
+
+                <!-- Contacts Form (hidden by default) -->
+                <div id="contactForm" class="form-container" style="display: none;">
+                    <h2>Crea Nuovo Contatto</h2>
+                    <form id="createContactForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="contactNome">Nome</label>
+                                <input type="text" id="contactNome" placeholder="es. Mario">
+                            </div>
+                            <div class="form-group">
+                                <label for="contactCognome">Cognome</label>
+                                <input type="text" id="contactCognome" placeholder="es. Rossi">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="contactEmail">Email</label>
+                                <input type="email" id="contactEmail" placeholder="mario.rossi@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="contactTelefono">Telefono</label>
+                                <input type="tel" id="contactTelefono" placeholder="+39 123 456 7890">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="contactDescrizione">Descrizione</label>
+                            <textarea id="contactDescrizione" rows="3" placeholder="Breve descrizione del contatto..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="contactTipo">Tipo</label>
+                            <input type="text" id="contactTipo" placeholder="es. startup, investitore, fornitore, ...">
+                        </div>
+                        <div class="form-group">
+                            <label for="contactDoveConosciuto">Dove Conosciuto</label>
+                            <input type="text" id="contactDoveConosciuto" placeholder="es. Conferenza Tech, LinkedIn, Università">
+                        </div>
+                        <div class="form-group">
+                            <label for="contactNote">Note</label>
+                            <textarea id="contactNote" rows="2" placeholder="Note aggiuntive..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="contactUrl">URL</label>
+                            <input type="url" id="contactUrl" placeholder="https://linkedin.com/in/...">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Salva Contatto</button>
+                            <button type="button" id="cancelContactBtn" class="secondary-btn">Annulla</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Contacts Filters -->
+                <div class="filters-container">
+                    <input type="text" id="contactFilterTipo" placeholder="Filtra per tipo...">
+                    <select id="contactSortOrder" class="secondary-btn" style="min-width: 200px;">
+                        <option value="name-asc">🔤 Nome A-Z</option>
+                        <option value="name-desc">🔤 Nome Z-A</option>
+                        <option value="date-desc">📅 Più recenti</option>
+                        <option value="date-asc">📅 Più vecchi</option>
+                    </select>
+                    <button id="refreshContactsBtn" class="secondary-btn">🔄 Aggiorna</button>
+                </div>
+
+                <!-- Contacts Table -->
+                <div id="contactsList" class="contacts-table-container">
+                    <p class="loading">Caricamento contatti...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Events & Places View -->
+        <div id="eventsView" class="view">
+            <div class="section-container">
+                <div class="section-header">
+                    <h1>📍 Eventi & Luoghi</h1>
+                    <div class="button-group">
+                        <button id="newEventBtn" class="primary-btn">+ Nuovo Evento</button>
+                        <button id="newPlaceBtn" class="primary-btn">+ Nuovo Luogo</button>
+                    </div>
+                </div>
+
+                <!-- Event Form (hidden by default) -->
+                <div id="eventForm" class="form-container" style="display: none;">
+                    <h2>Crea Nuovo Evento</h2>
+                    <form id="createEventForm">
+                        <div class="form-group">
+                            <label for="eventNome">Nome Evento *</label>
+                            <input type="text" id="eventNome" placeholder="es. AWS Summit Milano 2024" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="eventData">Data</label>
+                                <input type="date" id="eventData">
+                            </div>
+                            <div class="form-group">
+                                <label for="eventLuogo">Luogo</label>
+                                <input type="text" id="eventLuogo" placeholder="es. Milano Convention Center">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="eventDescrizione">Descrizione</label>
+                            <textarea id="eventDescrizione" rows="4" placeholder="Descrizione dettagliata dell'evento..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Salva Evento</button>
+                            <button type="button" id="cancelEventBtn" class="secondary-btn">Annulla</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Place Form (hidden by default) -->
+                <div id="placeForm" class="form-container" style="display: none;">
+                    <h2>Crea Nuovo Luogo</h2>
+                    <form id="createPlaceForm">
+                        <div class="form-group">
+                            <label for="placeNome">Nome Luogo *</label>
+                            <input type="text" id="placeNome" placeholder="es. Ristorante La Pergola" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="placeCategoria">Categoria</label>
+                                <select id="placeCategoria">
+                                    <option value="">Seleziona categoria</option>
+                                    <option value="ristorante">🍽️ Ristorante</option>
+                                    <option value="sport">⚽ Sport</option>
+                                    <option value="agriturismo">🌾 Agriturismo</option>
+                                    <option value="museo">🏛️ Museo</option>
+                                    <option value="teatro">🎭 Teatro</option>
+                                    <option value="cinema">🎬 Cinema</option>
+                                    <option value="bar">🍺 Bar/Pub</option>
+                                    <option value="hotel">🏨 Hotel</option>
+                                    <option value="parco">🌳 Parco</option>
+                                    <option value="altro">📌 Altro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="placeIndirizzo">Indirizzo</label>
+                                <input type="text" id="placeIndirizzo" placeholder="Via, Città, CAP">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="placeDescrizione">Descrizione</label>
+                            <textarea id="placeDescrizione" rows="4" placeholder="Descrizione del luogo..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Salva Luogo</button>
+                            <button type="button" id="cancelPlaceBtn" class="secondary-btn">Annulla</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Events & Places Filters -->
+                <div class="filters-container">
+                    <select id="eventPlaceType">
+                        <option value="all">📋 Tutti</option>
+                        <option value="events">📅 Solo Eventi</option>
+                        <option value="places">📍 Solo Luoghi</option>
+                    </select>
+                    <input type="text" id="eventPlaceFilterLocation" placeholder="Filtra per posizione...">
+                    <select id="eventPlaceFilterCategory">
+                        <option value="">Tutte le categorie</option>
+                        <option value="ristorante">🍽️ Ristorante</option>
+                        <option value="sport">⚽ Sport</option>
+                        <option value="agriturismo">🌾 Agriturismo</option>
+                        <option value="museo">🏛️ Museo</option>
+                        <option value="teatro">🎭 Teatro</option>
+                        <option value="cinema">🎬 Cinema</option>
+                        <option value="bar">🍺 Bar/Pub</option>
+                        <option value="hotel">🏨 Hotel</option>
+                        <option value="parco">🌳 Parco</option>
+                        <option value="altro">📌 Altro</option>
+                    </select>
+                    <button id="refreshEventsPlacesBtn" class="secondary-btn">🔄 Aggiorna</button>
+                </div>
+
+                <!-- Events & Places List -->
+                <div id="eventsPlacesList" class="items-list">
+                    <p class="loading">Caricamento eventi e luoghi...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Goal Modal -->
+    <div id="editGoalModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Modifica Obiettivo</h2>
+                <button class="modal-close" onclick="closeEditGoalModal()">&times;</button>
+            </div>
+            <form id="editGoalForm" onsubmit="handleUpdateGoal(event)">
+                <input type="hidden" id="editGoalId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editGoalAmbito">Ambito *</label>
+                        <input type="text" id="editGoalAmbito" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editGoalPriorita">Priorità *</label>
+                        <select id="editGoalPriorita" required>
+                            <option value="low">Bassa</option>
+                            <option value="medium">Media</option>
+                            <option value="high">Alta</option>
+                            <option value="urgent">Urgente</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editGoalTitolo">Titolo *</label>
+                    <input type="text" id="editGoalTitolo" required>
+                </div>
+                <div class="form-group">
+                    <label for="editGoalDescrizione">Descrizione</label>
+                    <textarea id="editGoalDescrizione" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editGoalScadenza">Scadenza *</label>
+                        <input type="date" id="editGoalScadenza" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editGoalStatus">Stato *</label>
+                        <select id="editGoalStatus" required>
+                            <option value="active">Attivo</option>
+                            <option value="completed">Completato</option>
+                            <option value="cancelled">Cancellato</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editGoalMetriche">Metriche (JSON)</label>
+                    <textarea id="editGoalMetriche" rows="2"></textarea>
+                    <small>Formato: {"chiave": valore, ...}</small>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
+                    <button type="button" class="secondary-btn" onclick="closeEditGoalModal()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Project Modal -->
+    <div id="editProjectModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Modifica Progetto</h2>
+                <button class="modal-close" onclick="closeEditProjectModal()">&times;</button>
+            </div>
+            <form id="editProjectForm" onsubmit="handleUpdateProject(event)">
+                <input type="hidden" id="editProjectId">
+                <div class="form-group">
+                    <label for="editProjectAmbito">Ambito *</label>
+                    <input type="text" id="editProjectAmbito" required>
+                </div>
+                <div class="form-group">
+                    <label for="editProjectTitolo">Titolo *</label>
+                    <input type="text" id="editProjectTitolo" required>
+                </div>
+                <div class="form-group">
+                    <label for="editProjectGithubUrl">GitHub URL</label>
+                    <input type="url" id="editProjectGithubUrl">
+                </div>
+                <div class="form-group">
+                    <label for="editProjectDescrizione">Descrizione</label>
+                    <textarea id="editProjectDescrizione" rows="4"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editProjectTag">Tecnologie/Tag</label>
+                    <input type="text" id="editProjectTag" placeholder="Python, AWS, React (separati da virgola)">
+                    <small>Inserisci le tecnologie separate da virgola</small>
+                </div>
+                <div class="form-group">
+                    <label for="editProjectStatus">Stato *</label>
+                    <select id="editProjectStatus" required>
+                        <option value="active">Attivo</option>
+                        <option value="completed">Completato</option>
+                        <option value="cancelled">Cancellato</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
+                    <button type="button" class="secondary-btn" onclick="closeEditProjectModal()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Contact Modal -->
+    <div id="editContactModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Modifica Contatto</h2>
+                <button class="modal-close" onclick="closeEditContactModal()">&times;</button>
+            </div>
+            <form id="editContactForm" onsubmit="handleUpdateContact(event)">
+                <input type="hidden" id="editContactId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editContactNome">Nome</label>
+                        <input type="text" id="editContactNome">
+                    </div>
+                    <div class="form-group">
+                        <label for="editContactCognome">Cognome</label>
+                        <input type="text" id="editContactCognome">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editContactEmail">Email</label>
+                        <input type="email" id="editContactEmail">
+                    </div>
+                    <div class="form-group">
+                        <label for="editContactTelefono">Telefono</label>
+                        <input type="tel" id="editContactTelefono">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editContactDescrizione">Descrizione</label>
+                    <textarea id="editContactDescrizione" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editContactTipo">Tipo</label>
+                    <input type="text" id="editContactTipo">
+                </div>
+                <div class="form-group">
+                    <label for="editContactDoveConosciuto">Dove Conosciuto</label>
+                    <input type="text" id="editContactDoveConosciuto">
+                </div>
+                <div class="form-group">
+                    <label for="editContactNote">Note</label>
+                    <textarea id="editContactNote" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editContactUrl">URL</label>
+                    <input type="url" id="editContactUrl">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
+                    <button type="button" class="secondary-btn" onclick="closeEditContactModal()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Event Modal -->
+    <div id="editEventModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Modifica Evento</h2>
+                <button class="modal-close" onclick="closeEditEventModal()">&times;</button>
+            </div>
+            <form id="editEventForm" onsubmit="handleUpdateEvent(event)">
+                <input type="hidden" id="editEventId">
+                <div class="form-group">
+                    <label for="editEventNome">Nome Evento *</label>
+                    <input type="text" id="editEventNome" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editEventData">Data</label>
+                        <input type="date" id="editEventData">
+                    </div>
+                    <div class="form-group">
+                        <label for="editEventLuogo">Luogo</label>
+                        <input type="text" id="editEventLuogo">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editEventDescrizione">Descrizione</label>
+                    <textarea id="editEventDescrizione" rows="4"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
+                    <button type="button" class="secondary-btn" onclick="closeEditEventModal()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Place Modal -->
+    <div id="editPlaceModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Modifica Luogo</h2>
+                <button class="modal-close" onclick="closeEditPlaceModal()">&times;</button>
+            </div>
+            <form id="editPlaceForm" onsubmit="handleUpdatePlace(event)">
+                <input type="hidden" id="editPlaceId">
+                <div class="form-group">
+                    <label for="editPlaceNome">Nome Luogo *</label>
+                    <input type="text" id="editPlaceNome" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editPlaceCategoria">Categoria</label>
+                        <select id="editPlaceCategoria">
+                            <option value="">Seleziona categoria</option>
+                            <option value="ristorante">🍽️ Ristorante</option>
+                            <option value="sport">⚽ Sport</option>
+                            <option value="agriturismo">🌾 Agriturismo</option>
+                            <option value="museo">🏛️ Museo</option>
+                            <option value="teatro">🎭 Teatro</option>
+                            <option value="cinema">🎬 Cinema</option>
+                            <option value="bar">🍺 Bar/Pub</option>
+                            <option value="hotel">🏨 Hotel</option>
+                            <option value="parco">🌳 Parco</option>
+                            <option value="altro">📌 Altro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPlaceIndirizzo">Indirizzo</label>
+                        <input type="text" id="editPlaceIndirizzo">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editPlaceDescrizione">Descrizione</label>
+                    <textarea id="editPlaceDescrizione" rows="4"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
+                    <button type="button" class="secondary-btn" onclick="closeEditPlaceModal()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    </div> <!-- Fine mainApp -->
+
+    <script src="cognito-config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

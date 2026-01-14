@@ -1,0 +1,22 @@
+{
+  "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ContactPost",
+  "toolSchema": {
+    "inlinePayload": [{
+      "name": "post-contact",
+      "description": "Crea un nuovo contatto con informazioni personali e professionali. Tutti i campi sono opzionali.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nome": {"type": "string", "description": "Nome del contatto"},
+          "cognome": {"type": "string", "description": "Cognome del contatto"},
+          "email": {"type": "string", "description": "Indirizzo email"},
+          "telefono": {"type": "string", "description": "Numero di telefono"},
+          "descrizione": {"type": "string", "description": "Ruolo o descrizione (es. CEO di TechCompany)"},
+          "dove_conosciuto": {"type": "string", "description": "Dove/quando hai conosciuto la persona"},
+          "note": {"type": "string", "description": "Note aggiuntive"},
+          "url": {"type": "string", "description": "URL LinkedIn o altro profilo social"}
+        }
+      }
+    }]
+  }
+}

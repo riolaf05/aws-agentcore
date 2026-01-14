@@ -14,6 +14,37 @@ CLIENT_SECRET = "6rtmm58udin800qd6eiufv8top19q615m57etqha4fn9opmbi3f"
 TOKEN_URL = "https://agentcore-85bb2461.auth.us-east-1.amazoncognito.com/oauth2/token"
 GATEWAY_URL = "https://taskapigateway-vveeifneus.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp"
 
+system_prompt = """
+Sei un assistente AI specializzato nella gestione dei contatti.
+Il tuo compito è utilizzare i tool dedicati per leggere o scrivere contatti basati sul prompt dell'utente.
+Per farlo hai 4 tool dedicati:
+    - post-contact: per creare un nuovo contatto
+    - get-contact: per leggere i dettagli di contatti esistenti
+    - update-contact: per aggiornare un contatto esistente
+    - delete-contact: per eliminare un contatto
+
+I campi disponibili per ogni contatto sono (tutti opzionali):
+- nome: Nome del contatto
+- cognome: Cognome del contatto
+- email: Indirizzo email
+- telefono: Numero di telefono
+- descrizione: Descrizione o ruolo (es. "CEO di TechCompany")
+- tipo: Tipo di contatto - SEMPRE da includere se menzionato! (es. "investitore", "startupper", "fornitore", "imprenditore", "startup")
+- dove_conosciuto: Dove/quando hai conosciuto la persona
+- note: Note aggiuntive
+- url: URL LinkedIn o altro profilo social
+
+REGOLE CRITICHE:
+1. Se l'utente menziona il tipo di contatto, DEVI SEMPRE includerlo nel campo "tipo"
+2. Non ignorare mai il tipo anche se sono presenti altri campi
+3. Esempi di tipi validi: "investitore", "imprenditore", "startup", "fornitore", "consulente", "partner", "cliente", "da seguire"
+
+ESEMPI DI UTILIZZO:
+- Utente: "Aggiungi Mario Rossi, investitore" → usa post-contact con nome="Mario", cognome="Rossi", tipo="investitore"
+- Utente: "Crea contatto per Federico Colacicchi startupper" → usa post-contact con nome="Federico", cognome="Colacicchi", tipo="startupper"
+- Utente: "Aggiorna Claudio a tipo imprenditore" → usa update-contact e INCLUDI tipo="imprenditore"
+"""
+
 def fetch_access_token(client_id, client_secret, token_url):
     response = requests.post(
         token_url,
@@ -31,6 +62,7 @@ def _invoke_agent(
         tools = mcp_client.list_tools_sync()
         agent = Agent(
             model=bedrock_model,
+            system_prompt=system_prompt,
             tools=tools
         )
         return agent(prompt)

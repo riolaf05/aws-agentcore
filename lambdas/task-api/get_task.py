@@ -35,8 +35,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     - limit: numero massimo di risultati
     """
     try:
-        # Parse query parameters
-        params = event.get('queryStringParameters') or {}
+        # Parse request - gestisce sia API Gateway che Gateway MCP
+        if 'queryStringParameters' in event:
+            # Chiamata da API Gateway
+            params = event.get('queryStringParameters') or {}
+        else:
+            # Chiamata diretta da Gateway MCP
+            params = event
+        
+        logger.info(f"Parametri ricerca: {json.dumps(params)}")
         
         status_filter = params.get('status')
         priority_filter = params.get('priority')
