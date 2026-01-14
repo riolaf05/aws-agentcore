@@ -102,17 +102,24 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
         )
         
         logger.info(f"Risposta ricevuta da '{agent_name}', contentType: {response.get('contentType')}")
+        logger.debug(f"Struttura risposta: {type(response.get('response'))}, Keys: {response.keys() if isinstance(response, dict) else 'N/A'}")
         
         # Processa la risposta
         if "text/event-stream" in response.get("contentType", ""):
             # Handle streaming response
             content = []
-            for line in response["response"].iter_lines(chunk_size=1024):
-                if line:
-                    line_str = line.decode("utf-8")
-                    if line_str.startswith("data: "):
-                        line_str = line_str[6:]
-                    content.append(line_str)
+            response_body = response.get("response")
+            
+            if hasattr(response_body, 'iter_lines'):
+                for line in response_body.iter_lines(chunk_size=1024):
+                    if line:
+                        line_str = line.decode("utf-8")
+                        if line_str.startswith("data: "):
+                            line_str = line_str[6:]
+                        content.append(line_str)
+            else:
+                logger.warning(f"Response body for streaming doesn't have iter_lines method: {type(response_body)}")
+                content = [str(response_body)]
             
             result = "\n".join(content)
             logger.debug(f"Risposta streaming da '{agent_name}': {result[:200]}...")
@@ -121,10 +128,39 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
         elif response.get("contentType") == "application/json":
             # Handle standard JSON response
             content = []
-            for chunk in response.get("response", []):
-                content.append(chunk.decode('utf-8'))
+            response_body = response.get("response")
             
-            result_data = json.loads(''.join(content))
+            # Handle different response body types
+            if hasattr(response_body, 'iter_lines'):
+                # It's a stream object
+                for line in response_body.iter_lines(chunk_size=1024):
+                    if line:
+                        content.append(line.decode("utf-8"))
+            elif isinstance(response_body, bytes):
+                # It's raw bytes
+                content.append(response_body.decode('utf-8'))
+            elif isinstance(response_body, str):
+                # It's already a string
+                content.append(response_body)
+            elif isinstance(response_body, list):
+                # It's a list of chunks
+                for chunk in response_body:
+                    if isinstance(chunk, bytes):
+                        content.append(chunk.decode('utf-8'))
+                    else:
+                        content.append(str(chunk))
+            else:
+                logger.warning(f"Unknown response body type: {type(response_body)}")
+                content.append(str(response_body))
+            
+            result_str = ''.join(content)
+            logger.debug(f"Raw JSON string da '{agent_name}': {result_str[:300]}...")
+            
+            try:
+                result_data = json.loads(result_str)
+            except json.JSONDecodeError:
+                logger.error(f"Errore parsing JSON: {result_str}")
+                return result_str
             
             # Gestisci sia dict che str
             if isinstance(result_data, dict):
@@ -138,7 +174,13 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
         else:
             # Raw response
             logger.warning(f"ContentType non gestito: {response.get('contentType')}")
-            return str(response)
+            # Try to read response body
+            response_body = response.get("response")
+            if hasattr(response_body, 'read'):
+                body_content = response_body.read().decode('utf-8')
+                return body_content
+            else:
+                return str(response)
             
     except Exception as e:
         logger.error(f"Errore invocando agente '{agent_name}': {e}", exc_info=True)
