@@ -566,27 +566,48 @@ async function handleCreateGoal(e) {
 async function loadProjects() {
     projectsList.innerHTML = '<p class="loading">Caricamento progetti...</p>';
     
-    const params = new URLSearchParams();
-    const ambito = projectFilterAmbito.value.trim();
-    const tag = projectFilterTag.value.trim();
-    
-    if (ambito) params.append('ambito', ambito);
-    if (tag) params.append('tag', tag);
-    
     try {
-        const response = await fetch(`${CONFIG.API_URL}/projects?${params.toString()}`);
+        const response = await fetch(`${CONFIG.API_URL}/projects`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
-        displayProjects(data.projects || []);
+        const allProjects = data.projects || [];
+        
+        // Filtra lato client per una ricerca più efficace
+        const filteredProjects = filterProjects(allProjects);
+        displayProjects(filteredProjects);
         
     } catch (error) {
         console.error('Error loading projects:', error);
         projectsList.innerHTML = `<p class="error-message">Errore caricamento progetti: ${error.message}</p>`;
     }
+}
+
+function filterProjects(projects) {
+    const ambito = projectFilterAmbito.value.trim().toLowerCase();
+    const tag = projectFilterTag.value.trim().toLowerCase();
+    
+    return projects.filter(project => {
+        // Filtra per ambito
+        if (ambito && !project.ambito.toLowerCase().includes(ambito)) {
+            return false;
+        }
+        
+        // Filtra per tag (cerca all'interno dell'array di tag)
+        if (tag && project.tag && project.tag.length > 0) {
+            const hasTag = project.tag.some(t => t.toLowerCase().includes(tag));
+            if (!hasTag) {
+                return false;
+            }
+        } else if (tag && (!project.tag || project.tag.length === 0)) {
+            return false;
+        }
+        
+        return true;
+    });
 }
 
 function displayProjects(projects) {
