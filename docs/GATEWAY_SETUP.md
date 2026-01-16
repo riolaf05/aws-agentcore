@@ -12,6 +12,23 @@ Questa guida spiega come configurare **AgentCore Gateway** per fornire accesso s
 ✅ **Gestione IAM**: Ruoli e permessi automatici  
 ✅ **Monitoring**: Integrazione con AgentCore Observability  
 
+## Sommario
+
+1. [Prerequisiti](#prerequisiti)
+2. [Step 1: Creare il Gateway MCP](#step-1-creare-il-gateway-mcp)
+3. [Step 2: Creare IAM Role per il Gateway](#step-2-creare-iam-role-per-il-gateway)
+4. [Step 3: Aggiungere Lambda Target - POST Task](#step-3-aggiungere-lambda-target---post-task)
+5. [Step 4: Aggiungere Lambda Target - GET Tasks](#step-4-aggiungere-lambda-target---get-tasks)
+6. [Step 4bis: Aggiungere Lambda Target - Candidate Matching](#step-4bis-aggiungere-lambda-target---candidate-matching-windows-powershell)
+7. [Step 5: Aggiungere Lambda Target - List All Needs](#step-5-aggiungere-lambda-target---list-all-needs)
+8. [Step 6: Aggiungere Lambda Target - Get Need by ID](#step-6-aggiungere-lambda-target---get-need-by-id)
+9. [Step 7: Aggiungere Lambda Target - Search Needs by Keyword](#step-7-aggiungere-lambda-target---search-needs-by-keyword)
+10. [Step 8: Verificare i Target del Gateway](#step-8-verificare-i-target-del-gateway)
+11. [Configurare le Variabili d'Ambiente](#step-9-configurare-le-variabili-dambiente)
+12. [Test del Gateway](#step-10-test-del-gateway)
+13. [Troubleshooting](#troubleshooting)
+14. [Best Practices](#best-practices)
+
 ## Architettura Gateway
 
 ```
@@ -323,6 +340,186 @@ agentcore gateway delete-mcp-gateway-target \
 ```
 
 ### Eliminare il Gateway
+
+```bash
+agentcore gateway delete-mcp-gateway \
+    --gateway-id gateway-abc123 \
+    --region us-east-1
+```
+
+## Step 4bis: Aggiungere Lambda Target - Candidate Matching (Windows PowerShell)
+
+Configura il target per il matching candidati-needs usando la Lambda `mg-matchguru-candidate-match-dev`:
+
+```powershell
+agentcore gateway create-mcp-gateway-target `
+    --gateway-arn arn:aws:bedrock-agentcore:us-east-1:879338784410:gateway/taskapigateway-vveeifneus `
+    --gateway-url https://taskapigateway-vveeifneus.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp `
+    --role-arn arn:aws:iam::879338784410:role/agentcore-taskapigateway-role `
+    --name candidate-matching `
+    --target-type lambda `
+    --region us-east-1 `
+    --target-payload '{
+      "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:mg-matchguru-candidate-match-dev",
+      "toolSchema": {
+        "inlinePayload": [{
+          "name": "find_matching_needs",
+          "description": "Trova i migliori needs per un candidato usando embeddings vettoriali e similarità coseno. Analizza skills, esperienza, lingue e preferenze. Restituisce top 5 needs ordinati per compatibilità con similarity score percentuale.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "candidate": {
+                "type": "object",
+                "description": "Oggetto candidato con skills, esperienze, lingue e preferenze",
+                "properties": {
+                  "id": {"type": "string", "description": "ID univoco del candidato"},
+                  "name": {"type": "string", "description": "Nome del candidato"},
+                  "surname": {"type": "string", "description": "Cognome del candidato"},
+                  "current_role": {"type": "string", "description": "Ruolo attuale del candidato"},
+                  "years_experience": {"type": "number", "description": "Anni totali di esperienza"},
+                  "province": {"type": "string", "description": "Provincia di residenza (es: MI, RM)"},
+                  "technologies": {"type": "array", "description": "Tecnologie conosciute", "items": {"type": "object", "properties": {"skill_name": {"type": "string"}}}},
+                  "hard_skills": {"type": "array", "description": "Competenze tecniche specifiche", "items": {"type": "object", "properties": {"skill_name": {"type": "string"}}}},
+                  "soft_skills": {"type": "array", "description": "Competenze trasversali", "items": {"type": "object", "properties": {"skill_name": {"type": "string"}}}},
+                  "languages": {"type": "array", "description": "Lingue conosciute con livello di proficiency", "items": {"type": "object", "properties": {"language": {"type": "string"}, "proficiency": {"type": "string"}}}}
+                },
+                "required": ["current_role"]
+              }
+            },
+            "required": ["candidate"]
+          }
+        }]
+      }
+    }'
+```
+
+**Note sulla configurazione:**
+- **Gateway ARN**: Usa `/gateway/` (non `/mcp-gateway/`)
+- **Gateway URL**: Formato `<gateway-id>.gateway.bedrock-agentcore.<region>.amazonaws.com/mcp`
+- **Role ARN**: Usa il ruolo di esecuzione del gateway (`agentcore-taskapigateway-role`)
+- **Region**: Specifica sempre `--region us-east-1`
+- **Target Payload**: Usa `lambdaArn` e `toolSchema.inlinePayload` (array di tool)
+
+**Output atteso:**
+```
+✅Target is ready
+Target ID: YAFODWZS0O
+Name: candidate-matching
+Status: READY
+```
+
+## Step 5: Aggiungere Lambda Target - List All Needs
+
+Configura il target per elencare tutti i needs disponibili:
+
+```powershell
+agentcore gateway create-mcp-gateway-target `
+    --gateway-arn arn:aws:bedrock-agentcore:us-east-1:879338784410:gateway/taskapigateway-vveeifneus `
+    --gateway-url https://taskapigateway-vveeifneus.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp `
+    --role-arn arn:aws:iam::879338784410:role/agentcore-taskapigateway-role `
+    --name list-all-needs `
+    --target-type lambda `
+    --region us-east-1 `
+    --target-payload '{
+      "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:mg-matchguru-needs-search-dev",
+      "toolSchema": {
+        "inlinePayload": [{
+          "name": "list_all_needs",
+          "description": "List all available needs from MongoDB database. Returns up to 1000 needs with complete details including title, description, required role, company, and location.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          }
+        }]
+      }
+    }'
+```
+
+## Step 6: Aggiungere Lambda Target - Get Need by ID
+
+Configura il target per recuperare un need specifico per ID:
+
+```powershell
+agentcore gateway create-mcp-gateway-target `
+    --gateway-arn arn:aws:bedrock-agentcore:us-east-1:879338784410:gateway/taskapigateway-vveeifneus `
+    --gateway-url https://taskapigateway-vveeifneus.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp `
+    --role-arn arn:aws:iam::879338784410:role/agentcore-taskapigateway-role `
+    --name get-need-by-id `
+    --target-type lambda `
+    --region us-east-1 `
+    --target-payload '{
+      "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:mg-matchguru-needs-search-dev",
+      "toolSchema": {
+        "inlinePayload": [{
+          "name": "get_need_by_id",
+          "description": "Retrieve a specific need by its unique ID. Returns detailed information including title, description, role requirements, company, salary range, and location.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique identifier of the need to retrieve (MongoDB ObjectId or custom ID)"
+              }
+            },
+            "required": ["id"]
+          }
+        }]
+      }
+    }'
+```
+
+## Step 7: Aggiungere Lambda Target - Search Needs by Keyword
+
+Configura il target per cercare needs per parola chiave:
+
+```powershell
+agentcore gateway create-mcp-gateway-target `
+    --gateway-arn arn:aws:bedrock-agentcore:us-east-1:879338784410:gateway/taskapigateway-vveeifneus `
+    --gateway-url https://taskapigateway-vveeifneus.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp `
+    --role-arn arn:aws:iam::879338784410:role/agentcore-taskapigateway-role `
+    --name search-needs-by-keyword `
+    --target-type lambda `
+    --region us-east-1 `
+    --target-payload '{
+      "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:mg-matchguru-needs-search-dev",
+      "toolSchema": {
+        "inlinePayload": [{
+          "name": "search_needs_by_keyword",
+          "description": "Search for needs by keyword. Searches across multiple fields including title, description, role name, company, and city. Returns up to 100 matching needs with full details.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Search keyword or phrase (e.g., 'Python developer', 'Senior manager', 'Milano'). Case-insensitive search across title, description, role, company, and location."
+              }
+            },
+            "required": ["query"]
+          }
+        }]
+      }
+    }'
+```
+
+## Step 8: Verificare i Target del Gateway
+
+Elenca tutti i target configurati:
+
+```powershell
+agentcore gateway list-mcp-gateway-targets `
+    --gateway-id taskapigateway-vveeifneus `
+    --region us-east-1
+```
+
+Dovresti vedere:
+- `save_task` (Step 3)
+- `get_tasks` (Step 4)
+- `candidate-matching` (Step 4bis)
+- `list-all-needs` (Step 5)
+- `get-need-by-id` (Step 6)
+- `search-needs-by-keyword` (Step 7)
+
+### Eliminare il Gateway (originale)
 
 ```bash
 agentcore gateway delete-mcp-gateway \

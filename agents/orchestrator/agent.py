@@ -43,7 +43,8 @@ AGENTS = {
     "calculator": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/calculator-lgV0vpGtcq",
     "project_goal_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt",
     "contact_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/contact_writer_reader-6T9ddn3sFx",
-    "event_place_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/event_place_writer_reader-2WQYqVFvzj"
+    "event_place_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/event_place_writer_reader-2WQYqVFvzj",
+    "needs_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/needs_reader-GM0Cq57Z3G"
 }
 
 # Istanza agente verra creata in modo lazy quando necessario
@@ -72,7 +73,7 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
     """Invoca un agente specializzato con un prompt specifico.
     
     Args:
-        agent_name: Nome dell'agente da invocare. Valori: researcher, calculator, project-goal-writer-reader, contact-writer-reader, event-place-writer-reader
+        agent_name: Nome dell'agente da invocare. Valori: researcher, calculator, project-goal-writer-reader, contact-writer-reader, event-place-writer-reader, needs_reader
         prompt: Il prompt da inviare all'agente
         
     Returns:
@@ -226,6 +227,14 @@ Agenti disponibili:
     * Campi: nome, descrizione, categoria (ristorante, sport, agriturismo, museo, teatro, cinema, bar, hotel, parco, altro), indirizzo
   - Supporta caricamento multiplo di eventi/luoghi
 
+- **needs_reader**: Cerca e recupera job needs dal database MongoDB MatchGuru
+  ARN: {needs_reader_arn}
+  Usa questo agente per:
+  - Elencare tutti i need disponibili
+  - Cercare need per parole chiave (ruolo, competenze, tecnologie, azienda, location)
+  - Recuperare un need specifico tramite ID
+  Esempi: "Mostrami i need per Cloud engineer", "Cerca need da Data Scientist", "Mostrami tutti i need disponibili"
+
 Processo di lavoro:
 1. Quando ricevi una richiesta, prima PENSA e crea un piano passo-passo
 2. Per ogni passo, identifica l'agente più adatto
@@ -249,6 +258,8 @@ Esempi di routing:
 - "Crea un evento per conferenza AI a Milano" → invoke_agent("event-place-writer-reader", "...")
 - "Aggiungi il ristorante Da Giovanni in via Roma" → invoke_agent("event-place-writer-reader", "...")
 - "Mostrami gli eventi a dicembre" → invoke_agent("event-place-writer-reader", "...")
+- "Mostrami i need per Cloud engineer" → invoke_agent("needs_reader", "...")
+- "Cerca need da Data Scientist a Milano" → invoke_agent("needs_reader", "...")
 - "Crea un task per studiare i risultati della ricerca su AI" → invoke_agent("researcher", "...") THEN invoke_agent("task-writer", "...")
 
 Sii proattivo e chiedi chiarimenti solo se strettamente necessario.
@@ -257,7 +268,8 @@ Sii proattivo e chiedi chiarimenti solo se strettamente necessario.
     calculator_arn=AGENTS["calculator"],
     project_goal_arn=AGENTS["project_goal_writer_reader"],
     contact_arn=AGENTS["contact_writer_reader"],
-    event_place_arn=AGENTS["event_place_writer_reader"]
+    event_place_arn=AGENTS["event_place_writer_reader"],
+    needs_reader_arn=AGENTS["needs_reader"]
 )
 
 

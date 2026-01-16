@@ -1,0 +1,15 @@
+{
+  "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:mg-matchguru-needs-search-dev",
+  "toolSchema": {
+    "inlinePayload": [
+      {
+        "name": "list_all_needs",
+        "description": "List all available needs from MongoDB database. Returns up to 1000 needs with complete details including title, description, required role, company, and location.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    ]
+  }
+}

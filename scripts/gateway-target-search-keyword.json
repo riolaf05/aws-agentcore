@@ -1,0 +1,21 @@
+{
+  "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:mg-matchguru-needs-search-dev",
+  "toolSchema": {
+    "inlinePayload": [
+      {
+        "name": "search_needs_by_keyword",
+        "description": "Search for needs by keyword. Searches across multiple fields including title, description, role name, company, and city. Returns up to 100 matching needs with full details.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search keyword or phrase (e.g., 'Python developer', 'Senior manager', 'Milano'). Case-insensitive search across title, description, role, company, and location."
+            }
+          },
+          "required": ["query"]
+        }
+      }
+    ]
+  }
+}
