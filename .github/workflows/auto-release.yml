@@ -1,0 +1,73 @@
+name: Auto Release on Main Merge
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+      
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+      
+      - name: Get previous tag
+        id: previoustag
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [ -z "${{ steps.previoustag.outputs.tag }}" ]; then
+            # First release - get all commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h) by @%an" --no-merges)
+          else
+            # Get commits since last tag
+            CHANGELOG=$(git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s (%h) by @%an" --no-merges)
+          fi
+          
+          # Save changelog to file (handling multiline)
+          echo "$CHANGELOG" > /tmp/changelog.txt
+          
+          # Also output for debugging
+          echo "Changelog generated:"
+          cat /tmp/changelog.txt
+      
+      - name: Create and push tag
+        env:
+          TAG_NAME: v${{ steps.date.outputs.date }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Read changelog from file
+          CHANGELOG_BODY=$(cat /tmp/changelog.txt)
+          
+          # Create annotated tag with changelog
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME - Auto-generated from main merge" -m "" -m "## Changelog" -m "$CHANGELOG_BODY"
+          
+          # Push tag
+          git push origin "$TAG_NAME"
+      
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.date.outputs.date }}
+          release_name: Release v${{ steps.date.outputs.date }}
+          body_path: /tmp/changelog.txt
+          draft: false
+          prerelease: false
