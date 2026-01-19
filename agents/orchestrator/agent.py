@@ -44,7 +44,8 @@ AGENTS = {
     "project_goal_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt",
     "contact_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/contact_writer_reader-6T9ddn3sFx",
     "event_place_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/event_place_writer_reader-2WQYqVFvzj",
-    "needs_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/needs_reader-GM0Cq57Z3G"
+    "needs_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/needs_reader-GM0Cq57Z3G",
+    "candidate_matcher": ""  # ARN da compilare dopo il deploy
 }
 
 # Istanza agente verra creata in modo lazy quando necessario
@@ -72,8 +73,11 @@ def retrieve_memories(query: str) -> List[Dict[str, Any]]:
 def invoke_agent(agent_name: str, prompt: str) -> str:
     """Invoca un agente specializzato con un prompt specifico.
     
+    Propaga automaticamente parametri di contesto (session_id, candidate_id, etc.) 
+    dal payload originale all'agente invocato.
+    
     Args:
-        agent_name: Nome dell'agente da invocare. Valori: researcher, calculator, project-goal-writer-reader, contact-writer-reader, event-place-writer-reader, needs_reader
+        agent_name: Nome dell'agente da invocare. Valori: researcher, calculator, project-goal-writer-reader, contact-writer-reader, event-place-writer-reader, needs_reader, candidate_matcher
         prompt: Il prompt da inviare all'agente
         
     Returns:
@@ -89,11 +93,17 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
     logger.debug(f"Prompt: {prompt}")
     
     try:
-        # Genera session ID univoco
-        session_id = str(uuid.uuid4())
+        # Propaga session_id e altri parametri di contesto dallo state
+        session_id = agent.state.get("session_id", str(uuid.uuid4()))
         
-        # Prepara payload
-        payload_data = json.dumps({"prompt": prompt}).encode('utf-8')
+        # Prepara payload: propaga automaticamente parametri extra dal payload originale
+        payload_dict = {"prompt": prompt, "session_id": session_id}
+        
+        # Propaga parametri extra (candidate_id, user_id, etc.) se presenti nello state
+        extra_params = agent.state.get("extra_params", {})
+        payload_dict.update(extra_params)
+        
+        payload_data = json.dumps(payload_dict).encode('utf-8')
         
         # Invoca l'agente
         response = agent_core_client.invoke_agent_runtime(
@@ -235,6 +245,14 @@ Agenti disponibili:
   - Recuperare un need specifico tramite ID
   Esempi: "Mostrami i need per Cloud engineer", "Cerca need da Data Scientist", "Mostrami tutti i need disponibili"
 
+- **candidate_matcher**: 🆕 Agente con MEMORIA per interviste candidati (usa SHORT-TERM MEMORY)
+  ARN: {candidate_matcher_arn}
+  Usa questo agente per:
+  - Intervistare candidati con conversazione multi-turno (ricorda tutto!)
+  - Matching candidati con job needs
+  - Analisi competenze tecniche e soft skills
+  Esempio: invoke_agent("candidate_matcher", "Candidato esperto Python con 5 anni exp")
+
 Processo di lavoro:
 1. Quando ricevi una richiesta, prima PENSA e crea un piano passo-passo
 2. Per ogni passo, identifica l'agente più adatto
@@ -282,8 +300,13 @@ def invoke(payload: Dict[str, Any], context: Optional[RequestContext] = None) ->
     actor_id = payload.get("actor_id", DEFAULT_ACTOR_ID)
     session_id = context.session_id if context and context.session_id else payload.get("session_id", DEFAULT_SESSION_ID)
     
+    # Estrai parametri extra da propagare agli agenti (candidate_id, user_id, etc.)
+    extra_params = {k: v for k, v in payload.items() 
+                    if k not in ["prompt", "actor_id", "session_id"]}
+    
     logger.info("Orchestrator invocato")
     logger.debug(f"Payload: {json.dumps(payload, indent=2)}")
+    logger.debug(f"Extra params da propagare: {extra_params}")
     
     # Configura il modello
     model = BedrockModel(
@@ -300,7 +323,7 @@ def invoke(payload: Dict[str, Any], context: Optional[RequestContext] = None) ->
                 ShortMemoryHook(memory_id=memory_config.memory_id),
                 LongTermMemoryHook(memory_id=memory_config.memory_id)
             ],
-            state={"actor_id": actor_id, "session_id": session_id},
+            state={"actor_id": actor_id, "session_id": session_id, "extra_params": extra_params},
             model=model,
             system_prompt=SYSTEM_PROMPT,
             tools=[retrieve_memories, invoke_agent]

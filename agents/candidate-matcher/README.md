@@ -1,13 +1,114 @@
 # Candidate Matcher Agent
 
-Agente AI specializzato nel matching tra candidati e needs/posizioni lavorative usando embeddings vettoriali e similarità coseno.
+Agente AI specializzato nel matching tra candidati e needs/posizioni lavorative usando embeddings vettoriali e similarità coseno, con **Short-Term Memory per seguire la conversazione durante l'intervista iniziale**.
 
 ## Funzionalità
 
 L'agente:
 1. **Raccoglie informazioni** sul candidato attraverso conversazione naturale
-2. **Utilizza il tool MCP** `find_matching_needs` per trovare i 5 migliori needs compatibili
-3. **Presenta i risultati** in modo chiaro con percentuale di compatibilità e motivazioni
+2. **Ricorda la conversazione** usando la Short-Term Memory di Bedrock AgentCore
+3. **Utilizza il tool MCP** `find_matching_needs` per trovare i 5 migliori needs compatibili
+4. **Presenta i risultati** in modo chiaro con percentuale di compatibilità e motivazioni
+
+## Novità: Short-Term Memory
+
+✨ **L'agente ora ricorda tutto durante l'intervista!**
+
+- **Carica il contesto**: All'inizio recupera gli ultimi 5 turni di conversazione
+- **Continua naturalmente**: Non ripete domande già fatte
+- **Mantiene i dati**: Per 7 giorni di follow-up con lo stesso candidato
+
+## 📖 Documentazione
+
+| Documento | Descrizione |
+|-----------|------------|
+| [QUICKSTART_MEMORY.md](./QUICKSTART_MEMORY.md) | **START HERE** - Setup in 5 minuti e test |
+| [MEMORY_SETUP.md](./MEMORY_SETUP.md) | Setup dettagliato della memory resource |
+| [MEMORY_ARCHITECTURE.md](./MEMORY_ARCHITECTURE.md) | Come funziona internamente l'agente |
+
+## ⚙️ Permessi IAM Necessari
+
+Per accedere alla memoria, la **IAM execution role dell'agente** deve avere i seguenti permessi:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:ListEvents",
+        "bedrock-agentcore:CreateEvent",
+        "bedrock-agentcore:GetMemory",
+        "bedrock-agentcore:ListMemories"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:REGION:ACCOUNT_ID:memory/MEMORY_ID"
+    }
+  ]
+}
+```
+
+**Perché servono questi permessi?**
+- `ListEvents`: Permette all'agente di **leggere la cronologia** delle conversazioni salvate
+- `CreateEvent`: Permette all'agente di **salvare nuovi turni** di conversazione
+- `GetMemory`: Consente di recuperare informazioni sulla configurazione della memoria
+- `ListMemories`: Permette di elencare le memorie disponibili
+
+**Come applicare i permessi:**
+
+```bash
+# Sostituisci con i tuoi valori
+ROLE_NAME="AmazonBedrockAgentCoreSDKRuntime-REGION-xxxxxx"
+MEMORY_ID="candidate_matcher_stm-xxxxxxxxxx"
+ACCOUNT_ID="123456789012"
+
+# Aggiungi la policy alla role
+aws iam put-role-policy \
+  --role-name $ROLE_NAME \
+  --policy-name CandidateMatcherMemoryAccess \
+  --policy-document file://memory-policy.json
+```
+
+> 💡 **Nota**: Il file `memory-policy.json` viene creato automaticamente dallo script `setup_memory.py`
+
+## Quickstart con Memory
+
+### 1. Setup della Memory (una volta sola)
+
+```bash
+# Setup automatico
+python agents/candidate-matcher/setup_memory.py
+
+# Oppure manuale
+export MEMORY_ID=mem-xxxxxxxxxxxxxxxx
+export ACTOR_ID=candidate-matcher
+export AWS_REGION=us-east-1
+```
+
+### 2. Deploy dell'Agente
+
+```bash
+cd agents/candidate-matcher
+agentcore launch
+```
+
+### 3. Test Multi-Turno
+
+La memory permette una conversazione naturale su più messaggi:
+
+```bash
+# Primo turno - definisci il candidato
+SESSION="candidate-123-$(date +%s)"
+agentcore invoke '{"prompt":"Sono Marco, uno sviluppatore Python senior","session_id":"'$SESSION'"}'
+
+# Secondo turno - l'agente ricorda!
+agentcore invoke '{"prompt":"8 anni di esperienza, conosco AWS","session_id":"'$SESSION'"}'
+
+# Terzo turno - continua naturalmente
+agentcore invoke '{"prompt":"Parlo correntemente inglese","session_id":"'$SESSION'"}'
+```
+
+Se vuoi approfondire la memoria, vedi [MEMORY_SETUP.md](./MEMORY_SETUP.md)
 
 ## Schema di Input per il Tool
 

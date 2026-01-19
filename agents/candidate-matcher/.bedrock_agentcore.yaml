@@ -30,17 +30,17 @@ agents:
     bedrock_agentcore:
       agent_id: candidate_matcher-z9SCSIHCl3
       agent_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/candidate_matcher-z9SCSIHCl3
-      agent_session_id: 468cc6cb-50d8-4148-9e0d-82a8ab9b34d9
+      agent_session_id: ab7ca420-391d-42c7-befc-b58c9297b557
     codebuild:
       project_name: bedrock-agentcore-candidate_matcher-builder
       execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-c8e736b5b5
       source_bucket: bedrock-agentcore-codebuild-sources-879338784410-us-east-1
     memory:
       mode: STM_AND_LTM
-      memory_id: orchestrator_mem-SyV4bj45mc
+      memory_id: candidate_matcher_stm-zGQqqg8JBV
       memory_arn: null
       memory_name: candidate_matcher_memory
-      event_expiry_days: 30
+      event_expiry_days: 7
       first_invoke_memory_check_done: false
       was_created_by_toolkit: false
     identity:
