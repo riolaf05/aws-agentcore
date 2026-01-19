@@ -1,0 +1,21 @@
+{
+  "lambdaArn": "arn:aws:lambda:us-east-1:879338784410:function:mg-matchguru-needs-search-dev",
+  "toolSchema": {
+    "inlinePayload": [
+      {
+        "name": "get_need_by_id",
+        "description": "Retrieve a specific need by its unique ID. Returns detailed information including title, description, role requirements, company, salary range, and location.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The unique identifier of the need to retrieve (MongoDB ObjectId or custom ID)"
+            }
+          },
+          "required": ["id"]
+        }
+      }
+    ]
+  }
+}

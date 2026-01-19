@@ -1,0 +1,62 @@
+default_agent: needs_reader
+agents:
+  needs_reader:
+    name: needs_reader
+    entrypoint: C:/Users/r.laface/Desktop/Codice/aws-agentcore/agents/needs-reader/agent.py
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: docker
+    source_path: C:\Users\r.laface\Desktop\Codice\aws-agentcore\agents\needs-reader
+    aws:
+      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-adbd82b718
+      execution_role_auto_create: false
+      account: '879338784410'
+      region: us-east-1
+      ecr_repository: 879338784410.dkr.ecr.us-east-1.amazonaws.com/bedrock-agentcore-needs_reader
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: needs_reader-GM0Cq57Z3G
+      agent_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/needs_reader-GM0Cq57Z3G
+      agent_session_id: 125b5937-df79-4ea8-828e-56adb856a014
+    codebuild:
+      project_name: bedrock-agentcore-needs_reader-builder
+      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-adbd82b718
+      source_bucket: bedrock-agentcore-codebuild-sources-879338784410-us-east-1
+    memory:
+      mode: STM_AND_LTM
+      memory_id: orchestrator_mem-SyV4bj45mc
+      memory_arn: null
+      memory_name: needs_reader_memory
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+      was_created_by_toolkit: false
+    identity:
+      credential_providers: []
+      workload: null
+    aws_jwt:
+      enabled: false
+      audiences: []
+      signing_algorithm: ES384
+      issuer_url: null
+      duration_seconds: 300
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration:
+      workload_name: workload-5f6c5f81
+      userId: null
+    api_key_env_var_name: null
+    api_key_credential_provider_name: null
+    is_generated_by_agentcore_create: false
