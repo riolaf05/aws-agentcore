@@ -42,6 +42,7 @@ AGENTS = {
     "researcher": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/researcher-hGVInWG4SS",   
     "calculator": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/calculator-lgV0vpGtcq",
     "project_goal_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt",
+    "project-goal-writer-reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt",  # alias con trattini
     "contact_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/contact_writer_reader-6T9ddn3sFx",
     "event_place_writer_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/event_place_writer_reader-2WQYqVFvzj",
     "needs_reader": "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/needs_reader-GM0Cq57Z3G",
@@ -94,13 +95,15 @@ def invoke_agent(agent_name: str, prompt: str) -> str:
     
     try:
         # Propaga session_id e altri parametri di contesto dallo state
-        session_id = agent.state.get("session_id", str(uuid.uuid4()))
+        session_id = agent.state.get("session_id")
+        if not session_id:
+            session_id = str(uuid.uuid4())
         
         # Prepara payload: propaga automaticamente parametri extra dal payload originale
         payload_dict = {"prompt": prompt, "session_id": session_id}
         
         # Propaga parametri extra (candidate_id, user_id, etc.) se presenti nello state
-        extra_params = agent.state.get("extra_params", {})
+        extra_params = agent.state.get("extra_params") or {}
         payload_dict.update(extra_params)
         
         payload_data = json.dumps(payload_dict).encode('utf-8')
@@ -215,11 +218,26 @@ Agenti disponibili:
 - **calculator**: Esegue calcoli matematici e mantiene memoria delle operazioni
   ARN: {calculator_arn}
 
-- **project_goal_writer_reader**: Gestisce progetti e obiettivi strategici (CRUD completo)
+- **project_goal_writer_reader**: Gestisce progetti e obiettivi strategici (CRUD completo + NOTE)
   ARN: {project_goal_arn}
-  Usa questo agente per:
+  
+  ⚠️ IMPORTANTE - WORKFLOW PER AGGIUNGERE NOTE:
+  Quando l'utente chiede "Aggiungi una nota all'obiettivo X: [testo nota]" devi SEMPRE:
+  1. Invocare project_goal_writer_reader con: "Cerca l'obiettivo 'X' e aggiungi la nota: [testo nota]"
+  2. L'agente farà automaticamente: search-goal → recupera goal_id → update-goal con la nota
+  3. NON chiedere mai all'utente di aggiungere manualmente la nota dal frontend
+  
+  Funzionalità disponibili:
   - Creare, leggere, aggiornare progetti software
   - Creare, leggere, aggiornare o eliminare obiettivi strategici
+  - **Aggiungere note agli obiettivi**: traccia aggiornamenti di progresso con timestamp automatico
+  - **Cercare obiettivi per nome**: trova l'obiettivo per titolo usando search-goal
+  - **Leggere note di un obiettivo**: recupera lo storico completo delle note con timestamp
+  
+  Esempi di invocazione corretti:
+  - "Aggiungi nota all'obiettivo trading: studiare pattern" → invoke_agent("project_goal_writer_reader", "Cerca l'obiettivo 'trading' e aggiungi nota: studiare pattern")
+  - "Mostra note dell'obiettivo Q1" → invoke_agent("project_goal_writer_reader", "Cerca l'obiettivo 'Q1' e mostra le note")
+  - "Leggi obiettivo Reply" → invoke_agent("project_goal_writer_reader", "Cerca l'obiettivo 'Reply' e mostra i dettagli")
 
 - **contact_writer_reader**: Gestisce contatti personali e professionali (CRUD completo)
     ARN: {contact_arn}
@@ -245,14 +263,6 @@ Agenti disponibili:
   - Recuperare un need specifico tramite ID
   Esempi: "Mostrami i need per Cloud engineer", "Cerca need da Data Scientist", "Mostrami tutti i need disponibili"
 
-- **candidate_matcher**: 🆕 Agente con MEMORIA per interviste candidati (usa SHORT-TERM MEMORY)
-  ARN: {candidate_matcher_arn}
-  Usa questo agente per:
-  - Intervistare candidati con conversazione multi-turno (ricorda tutto!)
-  - Matching candidati con job needs
-  - Analisi competenze tecniche e soft skills
-  Esempio: invoke_agent("candidate_matcher", "Candidato esperto Python con 5 anni exp")
-
 Processo di lavoro:
 1. Quando ricevi una richiesta, prima PENSA e crea un piano passo-passo
 2. Per ogni passo, identifica l'agente più adatto
@@ -271,6 +281,11 @@ Esempi di routing:
 - "Crea un progetto per sistema di raccomandazione AI" → invoke_agent("project-goal-writer-reader", "...")
 - "Mostrami gli obiettivi per Reply" → invoke_agent("project-goal-writer-reader", "...")
 - "Crea un obiettivo per aumentare il fatturato Q1" → invoke_agent("project-goal-writer-reader", "...")
+- "Aggiungi una nota all'obiettivo Q1 sales" → invoke_agent("project-goal-writer-reader", "Cerca l'obiettivo 'Aumentare fatturato Q1' e aggiungi nota: 'Ho contattato 10 nuovi lead'")
+- "Aggiorna lo stato dell'obiettivo Progetto AI con nota di progresso" → invoke_agent("project-goal-writer-reader", "...")
+- "Mostrami le note dell'obiettivo Aumentare fatturato" → invoke_agent("project-goal-writer-reader", "Cerca l'obiettivo 'Aumentare fatturato' e mostra le note")
+- "Che aggiornamenti ci sono sull'obiettivo Q1?" → invoke_agent("project-goal-writer-reader", "Cerca l'obiettivo 'Q1' e mostra lo storico delle note")
+- "Leggi le note dell'obiettivo Progetto AI" → invoke_agent("project-goal-writer-reader", "Cerca l'obiettivo 'Progetto AI' e visualizza il campo note_history")
 - "Aggiungi un contatto per Mario Rossi" → invoke_agent("contact-writer-reader", "...")
 - "Mostrami i contatti conosciuti a Roma" → invoke_agent("contact-writer-reader", "...")
 - "Crea un evento per conferenza AI a Milano" → invoke_agent("event-place-writer-reader", "...")
@@ -326,7 +341,8 @@ def invoke(payload: Dict[str, Any], context: Optional[RequestContext] = None) ->
             state={"actor_id": actor_id, "session_id": session_id, "extra_params": extra_params},
             model=model,
             system_prompt=SYSTEM_PROMPT,
-            tools=[retrieve_memories, invoke_agent]
+            tools=[retrieve_memories, invoke_agent],
+            messages=[]  # Inizializza con lista vuota per evitare errori di formato dalla memoria
         )
     
     user_message = payload.get("prompt", "Come posso aiutarti?")

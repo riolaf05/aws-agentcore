@@ -84,6 +84,13 @@ npm-debug.log*
 *.img
 *.container
 
+# Archive files
+*.zip
+*.rar
+*.7z
+*.gz
+*.bz2
+
 # WebSocket agent (output, temp)
 agents/websockert-agent/*.log
 agents/websockert-agent/.env

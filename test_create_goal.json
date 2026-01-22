@@ -1,0 +1,9 @@
+{
+  "ambito": "Test",
+  "titolo": "Test Note Feature",
+  "descrizione": "Goal di test per verificare le note",
+  "scadenza": "2026-03-31",
+  "priorita": "medium",
+  "status": "active",
+  "note": "Prima nota di test - creata il 20 gennaio 2026"
+}

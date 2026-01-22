@@ -331,12 +331,54 @@ async function sendMessage() {
 
 // Converti markdown base in HTML
 function formatMarkdown(text) {
-    return text
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')  // **bold**
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')  // *italic*
-        .replace(/\n/g, '<br>')  // newlines
-        .replace(/`(.+?)`/g, '<code>$1</code>')  // `code`
-        .replace(/- (.+?)(<br>|$)/g, '• $1$2');  // - bullet points
+    let html = text;
+    
+    // Headers (## e #)
+    html = html.replace(/^### (.+?)$/gm, '<h3 style="margin: 12px 0 6px 0; font-weight: bold; font-size: 1.1em;">$1</h3>');
+    html = html.replace(/^## (.+?)$/gm, '<h2 style="margin: 15px 0 8px 0; font-weight: bold; font-size: 1.2em;">$2</h2>');
+    html = html.replace(/^# (.+?)$/gm, '<h1 style="margin: 18px 0 10px 0; font-weight: bold; font-size: 1.4em;">$1</h1>');
+    
+    // Bold **text**
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    
+    // Italic *text*
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    
+    // Code blocks ```code```
+    html = html.replace(/```([\s\S]*?)```/g, '<pre style="background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; margin: 8px 0;"><code>$1</code></pre>');
+    
+    // Inline code `code`
+    html = html.replace(/`(.+?)`/g, '<code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: monospace;">$1</code>');
+    
+    // Lista puntata: - item (capture the entire list block)
+    html = html.replace(/(?:^|\n)((?:(?:^|\n)- .+?(?=\n(?!-)|\n*$))+)/gm, function(match) {
+        let items = match.trim().split('\n').filter(line => line.startsWith('- '));
+        if (items.length > 0) {
+            let listHtml = '<ul style="margin: 8px 0; padding-left: 30px;">\n';
+            items.forEach(item => {
+                let itemText = item.replace(/^- /, '').trim();
+                listHtml += `  <li style="margin: 4px 0; line-height: 1.5;">${itemText}</li>\n`;
+            });
+            listHtml += '</ul>';
+            return '\n' + listHtml;
+        }
+        return match;
+    });
+    
+    // Paragrafi: separa doppio newline
+    html = html.replace(/\n\n+/g, '</p><p style="margin: 10px 0; line-height: 1.6;">');
+    html = '<p style="margin: 10px 0; line-height: 1.6;">' + html + '</p>';
+    
+    // Newlines singole -> <br>
+    html = html.replace(/\n/g, '<br>');
+    
+    // Chiudi tutti i <p> tag aperti
+    html = html.replace(/<br><\/p>/g, '</p>');
+    
+    // Link markdown [text](url)
+    html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" style="color: #0066cc; text-decoration: underline;">$1</a>');
+    
+    return html;
 }
 
 // Aggiungi messaggio alla chat
@@ -499,6 +541,25 @@ function displayGoals(goals) {
                             <span class="subtask-icon">${task.completato ? '✅' : '⬜'}</span>
                             <span class="subtask-text">${escapeHtml(task.titolo)}</span>
                             ${task.scadenza ? `<span class="subtask-date">${formatDate(task.scadenza)}</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+            ${goal.note_history && goal.note_history.length > 0 ? `
+            <div class="notes-section">
+                <div class="notes-header" onclick="toggleNotes('goal-${goal.goal_id}')">
+                    <span class="notes-toggle" id="toggle-notes-goal-${goal.goal_id}">▶</span>
+                    <span class="item-detail-label">📝 Note (${goal.note_history.length})</span>
+                </div>
+                <div class="notes-list collapsed" id="notes-goal-${goal.goal_id}">
+                    ${goal.note_history.slice().reverse().map(note => `
+                        <div class="note-card-item">
+                            <div class="note-card-header">
+                                <span class="note-card-date">${formatDateTime(note.timestamp)}</span>
+                                <span class="note-source-badge ${note.source || 'frontend'}">${note.source === 'agent' ? '🤖 Agent' : '👤 Frontend'}</span>
+                            </div>
+                            <div class="note-card-content">${escapeHtml(note.note)}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -792,6 +853,19 @@ function toggleSubtasks(goalId) {
     }
 }
 
+function toggleNotes(goalId) {
+    const toggleIcon = document.getElementById(`toggle-notes-${goalId}`);
+    const notesList = document.getElementById(`notes-${goalId}`);
+    
+    if (notesList.classList.contains('collapsed')) {
+        notesList.classList.remove('collapsed');
+        toggleIcon.textContent = '▼';
+    } else {
+        notesList.classList.add('collapsed');
+        toggleIcon.textContent = '▶';
+    }
+}
+
 // ========================================
 // DELETE FUNCTIONS
 // ========================================
@@ -884,6 +958,24 @@ async function editGoal(goalId) {
         document.getElementById('editGoalPriorita').value = goal.priorita || 'medium';
         document.getElementById('editGoalStatus').value = goal.status || 'active';
         document.getElementById('editGoalMetriche').value = goal.metriche ? JSON.stringify(goal.metriche, null, 2) : '';
+        document.getElementById('editGoalNote').value = ''; // Clear note field
+        
+        // Display note history if exists
+        const notesHistorySection = document.getElementById('notesHistorySection');
+        const notesHistoryList = document.getElementById('notesHistoryList');
+        
+        if (goal.note_history && goal.note_history.length > 0) {
+            notesHistorySection.style.display = 'block';
+            notesHistoryList.innerHTML = goal.note_history.map(note => `
+                <div class="note-item">
+                    <span class="note-timestamp">${formatDateTime(note.timestamp)}</span>
+                    <span class="note-source ${note.source || 'frontend'}">${note.source === 'agent' ? '🤖 Agent' : '👤 Frontend'}</span>
+                    <div class="note-content">${escapeHtml(note.note)}</div>
+                </div>
+            `).join('');
+        } else {
+            notesHistorySection.style.display = 'none';
+        }
         
         // Show modal
         document.getElementById('editGoalModal').style.display = 'flex';
@@ -950,6 +1042,13 @@ async function handleUpdateGoal(e) {
             alert('Formato JSON metriche non valido');
             return;
         }
+    }
+    
+    // Add note if present
+    const noteText = document.getElementById('editGoalNote').value.trim();
+    if (noteText) {
+        goalData.note = noteText;
+        goalData.note_source = 'frontend';
     }
     
     try {

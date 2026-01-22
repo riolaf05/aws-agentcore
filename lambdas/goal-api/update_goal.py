@@ -24,6 +24,8 @@ def lambda_handler(event, context):
     - deadline (optional): New deadline
     - priority (optional): New priority
     - status (optional): New status
+    - note (optional): Add a note to note_history
+    - note_source (optional): Source of the note (frontend, agent) default: frontend
     """
     try:
         # Parse body if it's a string
@@ -55,6 +57,8 @@ def lambda_handler(event, context):
                 })
             }
         
+        existing_goal = response['Item']
+        
         # Build update expression dynamically
         update_expression_parts = []
         expression_attribute_values = {}
@@ -79,12 +83,34 @@ def lambda_handler(event, context):
                 expression_attribute_names[placeholder] = db_column
                 expression_attribute_values[value_placeholder] = body[frontend_field]
         
+        # Gestisci l'aggiunta di una nota alla history
+        if 'note' in body and body['note']:
+            note_entry = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'note': body['note'],
+                'source': body.get('note_source', 'frontend')
+            }
+            
+            # Se note_history non esiste, inizializzala
+            if 'note_history' not in existing_goal:
+                existing_goal['note_history'] = []
+            
+            # Aggiungi la nota
+            existing_goal['note_history'].append(note_entry)
+            
+            # Aggiorna l'espressione per note_history
+            placeholder = '#note_history'
+            value_placeholder = ':note_history'
+            update_expression_parts.append(f'{placeholder} = {value_placeholder}')
+            expression_attribute_names[placeholder] = 'note_history'
+            expression_attribute_values[value_placeholder] = existing_goal['note_history']
+        
         # Always update updated_at timestamp
         update_expression_parts.append('#updated_at = :updated_at')
         expression_attribute_names['#updated_at'] = 'updated_at'
         expression_attribute_values[':updated_at'] = datetime.utcnow().isoformat()
         
-        if not update_expression_parts:
+        if not update_expression_parts or len(update_expression_parts) == 1:
             return {
                 'statusCode': 400,
                 'body': json.dumps({

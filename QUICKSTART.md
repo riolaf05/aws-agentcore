@@ -102,6 +102,30 @@ cd ..\researcher
 agentcore invoke '{"prompt": "Cerca le novità di AWS Bedrock"}'
 ```
 
+### 6. Test rapidi degli agent con sessione (Windows)
+
+Per evitare problemi di quoting e della lunghezza minima del `runtimeSessionId` (>=33 caratteri), usa uno di questi approcci:
+
+```powershell
+# Sessione generata automaticamente (più semplice)
+agentcore invoke '{"prompt": "Mostrami le note dell obiettivo di trading"}' --agent orchestrator
+
+# Sessione esplicita con GUID valido (36 caratteri)
+$session = [guid]::NewGuid().ToString()
+agentcore invoke '{"prompt": "Mostrami le note dell obiettivo di trading"}' --agent orchestrator --session-id "$session"
+
+# Variante robusta con here-string (evita escaping complesso)
+agentcore invoke @"
+{
+  "prompt": "Mostrami le note dell obiettivo di trading"
+}
+"@ --agent orchestrator
+```
+
+Note:
+- Se la shell va in modalità inserimento, usa la variante con here-string.
+- Mantieni `--agent orchestrator` per routare verso il multi-agente.
+
 ## 📋 Checklist
 
 - [ ] Gateway Target `get-tasks` creato

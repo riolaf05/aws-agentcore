@@ -7,6 +7,7 @@
     <link rel="icon" type="image/svg+xml" href="favicon-robot.svg">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="modal-styles.css">
+    <link rel="stylesheet" href="message-formatting.css">
     <!-- AWS Cognito SDK -->
     <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
 </head>
@@ -498,6 +499,19 @@
                     <label for="editGoalMetriche">Metriche (JSON)</label>
                     <textarea id="editGoalMetriche" rows="2"></textarea>
                     <small>Formato: {"chiave": valore, ...}</small>
+                </div>
+                <div class="form-group">
+                    <label for="editGoalNote">📝 Aggiungi una nota agli aggiornamenti</label>
+                    <textarea id="editGoalNote" rows="3" placeholder="Descrivi il progresso o gli aggiornamenti..."></textarea>
+                    <small>La nota sarà aggiunta alla history dell'obiettivo con timestamp</small>
+                </div>
+                <!-- Notes History Section -->
+                <div id="notesHistorySection" style="display: none;">
+                    <div class="notes-header">
+                        <h4>📋 Storico Note</h4>
+                    </div>
+                    <div id="notesHistoryList" class="notes-history">
+                    </div>
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="primary-btn">💾 Salva Modifiche</button>
