@@ -104,3 +104,89 @@
 .modal-content::-webkit-scrollbar-thumb:hover {
     background: #5568d3;
 }
+
+/* Notes History Styles */
+.notes-header {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.notes-header h4 {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.notes-history {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    background: #f9fafb;
+}
+
+.notes-history::-webkit-scrollbar {
+    width: 6px;
+}
+
+.notes-history::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.notes-history::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.notes-history::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+.note-item {
+    padding: 12px;
+    margin-bottom: 8px;
+    background: white;
+    border-left: 3px solid #667eea;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.note-item:last-child {
+    margin-bottom: 0;
+}
+
+.note-timestamp {
+    display: block;
+    font-size: 11px;
+    color: #9ca3af;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.note-source {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.note-source.agent {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.note-content {
+    color: #374151;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}

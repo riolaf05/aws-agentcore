@@ -42,7 +42,8 @@ def lambda_handler(event, context):
                 "scadenza": "2025-02-15",
                 "completato": false
             }
-        ]
+        ],
+        "note": "Prima nota opzionale sull'obiettivo"
     }
     """
     
@@ -62,6 +63,7 @@ def lambda_handler(event, context):
     metriche = body.get('metriche', {})
     priorita = body.get('priorita', 'medium')
     sottotask = body.get('sottotask', [])
+    note = body.get('note', '')  # Note iniziali opzionali
     
     # Validazione campi obbligatori
     if not ambito:
@@ -104,6 +106,13 @@ def lambda_handler(event, context):
         'metriche': metriche,
         'priorita': priorita,
         'sottotask': sottotask,
+        'note_history': [
+            {
+                'timestamp': timestamp,
+                'note': note,
+                'source': 'frontend'  # frontend o agent
+            }
+        ] if note else [],
         'status': 'active',
         'created_at': timestamp,
         'updated_at': timestamp

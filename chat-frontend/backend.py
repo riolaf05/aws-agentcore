@@ -28,6 +28,7 @@ GOAL_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalA
 GOAL_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-GoalGet"
 GOAL_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-GoalDelete"
 GOAL_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-GoalUpdate"
+GOAL_SEARCH_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-GoalSearch"
 PROJECT_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectPost"
 PROJECT_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectGet"
 PROJECT_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-ProjectDelete"
@@ -340,6 +341,102 @@ def update_goal():
         
     except Exception as e:
         logger.error(f"❌ Error updating goal: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/goals/search', methods=['GET'])
+def search_goal():
+    """Cerca un goal per titolo/nome"""
+    try:
+        titolo = request.args.get('titolo')
+        ambito = request.args.get('ambito')
+        status = request.args.get('status')
+        limit = request.args.get('limit', '50')
+        
+        if not titolo:
+            logger.warning("GET /api/goals/search called without titolo parameter")
+            return jsonify({"error": "titolo è obbligatorio per la ricerca"}), 400
+        
+        logger.info(f"🔍 Searching goals by titolo: {titolo}")
+        
+        # Prepara query parameters
+        query_params = {
+            'titolo': titolo,
+            'limit': limit
+        }
+        if ambito:
+            query_params['ambito'] = ambito
+        if status:
+            query_params['status'] = status
+        
+        # Invoca Lambda con query parameters
+        response = lambda_client.invoke(
+            FunctionName=GOAL_SEARCH_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(query_params)
+        )
+        
+        result = json.loads(response['Payload'].read())
+        logger.debug(f"Lambda response: {result}")
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"Error searching goals: {str(e)}")
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/goals/<goal_id>/notes', methods=['POST'])
+def add_goal_note(goal_id):
+    """Aggiunge una nota a un goal esistente"""
+    try:
+        data = request.get_json()
+        note = data.get('note')
+        note_source = data.get('note_source', 'frontend')
+        
+        if not note:
+            logger.warning("POST goal note called without note")
+            return jsonify({"error": "note è obbligatorio"}), 400
+        
+        logger.info(f"📝 Adding note to goal: {goal_id}")
+        
+        # Prepara il payload per l'update
+        update_payload = {
+            'goal_id': goal_id,
+            'note': note,
+            'note_source': note_source
+        }
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=GOAL_UPDATE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(update_payload)
+        )
+        
+        result = json.loads(response['Payload'].read())
+        logger.debug(f"Lambda response: {result}")
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"Error adding note to goal: {str(e)}")
         return jsonify({"error": f"Errore: {str(e)}"}), 500
 
 

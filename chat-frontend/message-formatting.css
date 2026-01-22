@@ -1,0 +1,72 @@
+/* Enhanced message formatting with better markdown support */
+
+.message-content {
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.6 !important;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3 {
+    margin-top: 16px !important;
+    margin-bottom: 8px !important;
+    font-weight: 600 !important;
+}
+
+.message-content h1 {
+    font-size: 1.4em !important;
+}
+
+.message-content h2 {
+    font-size: 1.2em !important;
+}
+
+.message-content h3 {
+    font-size: 1.1em !important;
+}
+
+.message-content p {
+    margin: 10px 0 !important;
+    line-height: 1.6 !important;
+}
+
+.message-content ul,
+.message-content ol {
+    margin: 12px 0 !important;
+    padding-left: 30px !important;
+}
+
+.message-content li {
+    margin: 6px 0 !important;
+    line-height: 1.6 !important;
+}
+
+.message-content pre {
+    background: rgba(0, 0, 0, 0.05) !important;
+    padding: 12px !important;
+    border-radius: 6px !important;
+    overflow-x: auto !important;
+    margin: 10px 0 !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 0.9em !important;
+}
+
+.message-content a {
+    color: #667eea !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+}
+
+.message-content a:hover {
+    color: #764ba2 !important;
+}
+
+/* Per messaggi dell'assistente, colore scuro per i link */
+.assistant-message .message-content a {
+    color: #0066cc !important;
+}
+
+.assistant-message .message-content a:hover {
+    color: #0052a3 !important;
+}

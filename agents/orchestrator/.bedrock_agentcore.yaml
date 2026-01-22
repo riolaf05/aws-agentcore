@@ -30,7 +30,7 @@ agents:
     bedrock_agentcore:
       agent_id: orchestrator-HR2F4m7QCY
       agent_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/orchestrator-HR2F4m7QCY
-      agent_session_id: null
+      agent_session_id: e58ef331-1221-4f4a-9edd-57df7c353384
     codebuild:
       project_name: bedrock-agentcore-orchestrator-builder
       execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-11376b7e2a
