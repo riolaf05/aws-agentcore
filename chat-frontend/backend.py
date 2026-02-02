@@ -45,6 +45,15 @@ PLACE_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:Personal
 PLACE_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-PlaceGet"
 PLACE_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-PlaceDelete"
 PLACE_UPDATE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-PlaceUpdate"
+KB_POST_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-KBPost"
+KB_GET_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-KBGet"
+KB_DELETE_LAMBDA_ARN = "arn:aws:lambda:us-east-1:879338784410:function:PersonalAssistant-KBDelete"
+
+# N8N Webhooks per Knowledge Base
+N8N_WEBHOOK_KB_TEST = "http://host.docker.internal:5678/webhook-test/ae7ec17c-64fc-4848-bcd5-a081e11a6051"
+N8N_WEBHOOK_KB_PROD = "http://host.docker.internal:5678/webhook/ae7ec17c-64fc-4848-bcd5-a081e11a6051"
+# Token di autorizzazione per N8N (configura nel tuo ambiente)
+N8N_API_KEY = os.getenv('N8N_API_KEY', '')  # Imposta tramite variabile ambiente
 
 # Client AWS
 bedrock_client = boto3.client('bedrock-agentcore', region_name=REGION)
@@ -1126,6 +1135,237 @@ def update_place(place_id):
         
     except Exception as e:
         logger.error(f"❌ Error updating place: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+# ========================================
+# KNOWLEDGE BASE API ENDPOINTS
+# ========================================
+
+@app.route('/api/kb', methods=['GET'])
+def get_kb_documents():
+    """Recupera tutti i documenti della Knowledge Base"""
+    try:
+        tipo = request.args.get('tipo')
+        logger.info(f"📚 Getting KB documents, filter tipo: {tipo}")
+        
+        # Prepara l'evento per Lambda
+        event_payload = {
+            'queryStringParameters': {}
+        }
+        
+        if tipo:
+            event_payload['queryStringParameters']['tipo'] = tipo
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=KB_GET_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(event_payload)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"Retrieved {body.get('count', 0)} KB documents")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting KB documents: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/kb', methods=['POST'])
+def create_kb_document():
+    """Carica un nuovo documento nella Knowledge Base - invia sia a Lambda che a N8N"""
+    try:
+        # Ottieni l'endpoint (test o prod)
+        endpoint = request.form.get('endpoint', 'prod') if request.files else (request.get_json() or {}).get('endpoint', 'prod')
+        logger.info(f"📚 Creating KB document with endpoint: {endpoint}")
+        
+        # Check if file or form data
+        if request.files:
+            # Handle file upload
+            file = request.files.get('data')
+            tipo = request.form.get('type', 'meeting-notes')
+            
+            if file:
+                logger.info(f"📚 Uploading KB file: {file.filename}")
+                
+                # Read file content
+                file_content = file.read()
+                
+                # Create multipart form data payload for Lambda
+                import base64
+                
+                # Create multipart body
+                boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
+                body_parts = []
+                body_parts.append(f'--{boundary}')
+                body_parts.append(f'Content-Disposition: form-data; name="data"; filename="{file.filename}"')
+                body_parts.append('Content-Type: application/pdf')
+                body_parts.append('')
+                body_parts.append(file_content.decode('latin-1'))
+                body_parts.append(f'--{boundary}')
+                body_parts.append(f'Content-Disposition: form-data; name="type"')
+                body_parts.append('')
+                body_parts.append(tipo)
+                body_parts.append(f'--{boundary}--')
+                
+                multipart_body = '\r\n'.join(body_parts)
+                
+                payload = {
+                    'body': multipart_body,
+                    'isBase64Encoded': False,
+                    'headers': {
+                        'content-type': f'multipart/form-data; boundary={boundary}'
+                    }
+                }
+        else:
+            # Handle JSON data
+            data = request.get_json()
+            tipo = data.get('type', 'meeting-notes')
+            text = data.get('data', '')
+            
+            logger.info(f"📚 Creating KB text document")
+            
+            # Create multipart body for text
+            boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
+            body_parts = []
+            body_parts.append(f'--{boundary}')
+            body_parts.append(f'Content-Disposition: form-data; name="data"')
+            body_parts.append('')
+            body_parts.append(text)
+            body_parts.append(f'--{boundary}')
+            body_parts.append(f'Content-Disposition: form-data; name="type"')
+            body_parts.append('')
+            body_parts.append(tipo)
+            body_parts.append(f'--{boundary}--')
+            
+            multipart_body = '\r\n'.join(body_parts)
+            
+            payload = {
+                'body': multipart_body,
+                'isBase64Encoded': False,
+                'headers': {
+                    'content-type': f'multipart/form-data; boundary={boundary}'
+                }
+            }
+        
+        # 1️⃣ Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=KB_POST_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(payload)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        lambda_success = False
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            lambda_success = True
+            logger.info(f"✅ KB document created in Lambda")
+        else:
+            body = result
+            lambda_success = True
+        
+        # 2️⃣ Invia a N8N webhook (MUST succeed)
+        try:
+            webhook_url = N8N_WEBHOOK_KB_TEST if endpoint == 'test' else N8N_WEBHOOK_KB_PROD
+            
+            # Prepara payload per N8N (semplice JSON)
+            n8n_payload = {
+                'type': tipo,
+                'endpoint': endpoint,
+                'timestamp': json.loads(result.get('body', '{}')).get('created_at', '')
+            }
+            
+            logger.info(f"📡 Sending to N8N webhook: {webhook_url}")
+            logger.info(f"📡 N8N Payload: {json.dumps(n8n_payload)}")
+            
+            import requests
+            
+            # Prepara headers con autenticazione
+            headers = {'Content-Type': 'application/json'}
+            if N8N_API_KEY:
+                headers['x-api-key'] = N8N_API_KEY
+            
+            n8n_response = requests.post(webhook_url, json=n8n_payload, headers=headers, timeout=10)
+            logger.info(f"N8N webhook response: {n8n_response.status_code} - {n8n_response.text}")
+            
+            # Controlla che il webhook sia riuscito (2xx status code)
+            if n8n_response.status_code < 200 or n8n_response.status_code >= 300:
+                logger.error(f"❌ N8N webhook failed with status {n8n_response.status_code}: {n8n_response.text}")
+                return jsonify({"error": f"N8N webhook failed with status {n8n_response.status_code}"}), 500
+            
+            logger.info(f"✅ N8N webhook succeeded")
+            
+        except Exception as webhook_error:
+            logger.error(f"❌ N8N webhook error: {str(webhook_error)}", exc_info=True)
+            return jsonify({"error": f"N8N webhook error: {str(webhook_error)}"}), 500
+        
+        # Ritorna successo solo se sia Lambda che N8N hanno funzionato
+        return jsonify(body), result.get('statusCode', 201)
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating KB document: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/kb/<document_id>', methods=['DELETE'])
+def delete_kb_document(document_id):
+    """Elimina un documento della Knowledge Base"""
+    try:
+        logger.info(f"📚 Deleting KB document: {document_id}")
+        
+        # Prepara l'evento per Lambda
+        event_payload = {
+            'pathParameters': {
+                'document_id': document_id
+            }
+        }
+        
+        # Invoca Lambda
+        response = lambda_client.invoke(
+            FunctionName=KB_DELETE_LAMBDA_ARN,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(event_payload)
+        )
+        
+        # Leggi payload
+        payload_bytes = response['Payload'].read()
+        result = json.loads(payload_bytes)
+        
+        if response['StatusCode'] != 200:
+            return jsonify({"error": "Lambda invocation failed"}), 500
+        
+        # Estrai body se presente (formato API Gateway)
+        if 'body' in result:
+            body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            logger.info(f"KB document deleted successfully")
+            return jsonify(body), result.get('statusCode', 200)
+        
+        logger.info(f"KB document deleted successfully")
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting KB document: {str(e)}", exc_info=True)
         return jsonify({"error": f"Errore: {str(e)}"}), 500
 
 

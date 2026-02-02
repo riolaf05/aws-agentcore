@@ -14,6 +14,7 @@ services:
       # Flask configuration
       - FLASK_ENV=production
       - FLASK_APP=backend.py
+      - N8N_API_KEY=M4tJ6z9pZfiHeSjcrdeU18Xq4QcrpN6nAxkcNFiaYjpUTROOgUp6zGwN3jXqT08dahmdA3341hvtiu46oMygyUjqf1ELbCDUpd3aVFxqMrUH2fxOFlqRO1XafsDhIhFu
     restart: unless-stopped
     networks:
       - agentcore-network
@@ -39,10 +40,14 @@ services:
       - agentcore-network
 
   n8n:
-    image: n8nio/n8n:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.n8n
     container_name: aws-agentcore-n8n
     ports:
       - "5678:5678"
+    environment:
+      - N8N_COMMUNITY_PACKAGES_ENABLED=true
     volumes:
       - n8n_data:/home/node/.n8n
     restart: unless-stopped
