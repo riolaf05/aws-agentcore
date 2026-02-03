@@ -1661,6 +1661,11 @@ def delete_kb_document(document_id):
         # Estrai body se presente (formato API Gateway)
         if 'body' in result:
             body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            
+            # Log warning se presente
+            if 'warning' in body:
+                logger.warning(body['warning'])
+            
             logger.info(f"KB document deleted successfully")
             return jsonify(body), result.get('statusCode', 200)
         

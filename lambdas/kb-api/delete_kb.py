@@ -58,10 +58,16 @@ def lambda_handler(event, context):
         
         logger.info(f"Deleting document: {document_id}")
         
-        # Get document first to check if it has S3 file
-        response = table.get_item(Key={'document_id': document_id})
+        # Get document first to retrieve all keys and check if it has S3 file
+        # We need to scan because we only have document_id, not the full key
+        response = table.scan(
+            FilterExpression='document_id = :doc_id',
+            ExpressionAttributeValues={
+                ':doc_id': document_id
+            }
+        )
         
-        if 'Item' not in response:
+        if not response.get('Items'):
             return {
                 'statusCode': 404,
                 'headers': {
@@ -71,7 +77,7 @@ def lambda_handler(event, context):
                 'body': json.dumps({'error': 'Document not found'})
             }
         
-        document = response['Item']
+        document = response['Items'][0]
         
         # Delete from S3 if file exists
         if document.get('s3_key'):
@@ -105,6 +111,10 @@ def lambda_handler(event, context):
                 'body': json.dumps({'error': f'Error deleting document: {str(e)}'})
             }
         
+        # Warning message about embeddings
+        warning_msg = "⚠️ ATTENZIONE: Gli embedding vettoriali corrispondenti su Qdrant non vengono cancellati automaticamente."
+        logger.warning(warning_msg)
+        
         return {
             'statusCode': 200,
             'headers': {
@@ -113,7 +123,8 @@ def lambda_handler(event, context):
             },
             'body': json.dumps({
                 'message': 'Document deleted successfully',
-                'document_id': document_id
+                'document_id': document_id,
+                'warning': warning_msg
             })
         }
     
