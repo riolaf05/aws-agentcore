@@ -101,8 +101,7 @@ const kbFile = document.getElementById('kbFile');
 const kbText = document.getElementById('kbText');
 const kbType = document.getElementById('kbType');
 const kbList = document.getElementById('kbList');
-const toggleKBEndpointBtn = document.getElementById('toggleKBEndpointBtn');
-const kbEndpointLabel = document.getElementById('kbEndpointLabel');
+const qdrantCollectionSelect = document.getElementById('qdrantCollectionSelect');
 
 // Debug
 if (!kbList) console.error('Elemento kbList non trovato!');
@@ -111,22 +110,13 @@ if (!addKBBtn) console.error('Elemento addKBBtn non trovato!');
 
 // Configuration for Knowledge-base
 let isKBUploading = false; // Prevent double-submit
-let currentKBEndpoint = 'prod'; // Default: prod
 
 // ========================================
 // KNOWLEDGE-BASE FUNCTIONS
 // ========================================
 
-function updateKBEndpointUI() {
-    if (kbEndpointLabel) {
-        kbEndpointLabel.innerHTML = `Endpoint: <strong>${currentKBEndpoint}</strong>`;
-    }
-    console.log(`📡 KB Endpoint switched to: ${currentKBEndpoint}`);
-}
-
-function toggleKBEndpoint() {
-    currentKBEndpoint = currentKBEndpoint === 'prod' ? 'test' : 'prod';
-    updateKBEndpointUI();
+function getSelectedQdrantCollection() {
+    return qdrantCollectionSelect ? qdrantCollectionSelect.value : 'meetings_notes';
 }
 
 function closeKBModal() {
@@ -169,7 +159,7 @@ async function handleKBUpload(e) {
         }
         
         formData.append('type', kbType.value);
-        formData.append('endpoint', currentKBEndpoint);  // Passa l'endpoint (test o prod)
+        formData.append('collection', getSelectedQdrantCollection());  // Passa la collection Qdrant selezionata
         
         // Show loading state
         const submitBtn = kbUploadForm.querySelector('button[type="submit"]');
@@ -191,6 +181,19 @@ async function handleKBUpload(e) {
         
         const result = await response.json();
         console.log('Upload successful:', result);
+        console.log('Result tags:', result.tags);
+        console.log('Result document_id:', result.document_id);
+        
+        // Salva i tags nel localStorage per recuperarli successivamente
+        if (result.document_id && result.tags) {
+            const kbTags = JSON.parse(localStorage.getItem('kbTags') || '{}');
+            kbTags[result.document_id] = result.tags;
+            localStorage.setItem('kbTags', JSON.stringify(kbTags));
+            console.log('Tags saved to localStorage for doc', result.document_id, ':', result.tags);
+            console.log('All tags in localStorage:', JSON.parse(localStorage.getItem('kbTags')));
+        } else {
+            console.warn('No document_id or tags in response:', {document_id: result.document_id, tags: result.tags});
+        }
         
         // Show success message
         alert('✅ Documento caricato con successo!');
@@ -233,6 +236,8 @@ async function loadKBDocuments() {
         const documents = result.documents || [];
         
         console.log(`KB Documents loaded: ${documents.length} documenti`);
+        console.log('Documents structure:', documents);
+        console.log('First document:', documents[0]);
         
         // Mostra i documenti
         if (documents.length === 0) {
@@ -244,6 +249,10 @@ async function loadKBDocuments() {
                 </div>
             `;
         } else {
+            // Recupera i tags salvati dal localStorage
+            const kbTags = JSON.parse(localStorage.getItem('kbTags') || '{}');
+            console.log('Retrieved kbTags from localStorage:', kbTags);
+            
             kbList.innerHTML = `
                 <table class="kb-table">
                     <thead>
@@ -251,25 +260,49 @@ async function loadKBDocuments() {
                             <th>📄 Tipo</th>
                             <th>📝 Nome/Contenuto</th>
                             <th>📅 Data</th>
+                            <th>🏷️ Tag</th>
                             <th>🗑️ Azioni</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${documents.map(doc => `
-                            <tr>
-                                <td><span class="badge badge-type">${doc.tipo || 'N/A'}</span></td>
-                                <td>
-                                    ${doc.is_pdf ? 
-                                        `<span class="kb-filename">📄 ${doc.file_name}</span>` : 
-                                        `<span class="kb-text-preview">${(doc.text_content || '').substring(0, 100)}...</span>`
-                                    }
-                                </td>
-                                <td>${formatDateTime(doc.created_at)}</td>
-                                <td>
-                                    <button class="btn-delete-small" onclick="deleteKBDocument('${doc.document_id}', '${doc.created_at}')">🗑️</button>
-                                </td>
-                            </tr>
-                        `).join('')}
+                        ${documents.map((doc, idx) => {
+                            // Recupera i tags dal localStorage o dall'oggetto doc
+                            const tags = kbTags[doc.document_id] || doc.tags || {};
+                            console.log(`Document ${doc.document_id}:`, {tags, hasTagsInStorage: !!kbTags[doc.document_id], hasTagsInDoc: !!doc.tags});
+                            
+                            const tagsList = [];
+                            if (tags.nome_obiettivo) tagsList.push(`🎯 ${tags.nome_obiettivo}`);
+                            if (tags.data_odierna) tagsList.push(`📅 ${tags.data_odierna}`);
+                            if (tags.storage_mode) tagsList.push(`🔄 ${tags.storage_mode}`);
+                            
+                            const tagsCollapsedHtml = tagsList.length > 0 ? `
+                                <div class="kb-tags-collapse">
+                                    <button class="kb-tags-toggle" onclick="toggleKBTags('tags-${idx}')">
+                                        ▶ ${tagsList.length} tag${tagsList.length !== 1 ? 's' : ''}
+                                    </button>
+                                    <div id="tags-${idx}" class="kb-tags-list" style="display: none;">
+                                        ${tagsList.map(tag => `<div class="kb-tag-item">${tag}</div>`).join('')}
+                                    </div>
+                                </div>
+                            ` : `<span style="color: #999;">-</span>`;
+                            
+                            return `
+                                <tr>
+                                    <td><span class="badge badge-type">${doc.tipo || 'N/A'}</span></td>
+                                    <td>
+                                        ${doc.is_pdf ? 
+                                            `<span class="kb-filename">📄 ${doc.file_name}</span>` : 
+                                            `<span class="kb-text-preview">${(doc.text_content || '').substring(0, 100)}...</span>`
+                                        }
+                                    </td>
+                                    <td>${formatDateTime(doc.created_at)}</td>
+                                    <td>${tagsCollapsedHtml}</td>
+                                    <td>
+                                        <button class="btn-delete-small" onclick="deleteKBDocument('${doc.document_id}', '${doc.created_at}')">🗑️</button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
@@ -281,6 +314,18 @@ async function loadKBDocuments() {
         if (kbList) {
             kbList.innerHTML = '<p class="error">Errore nel caricamento dei documenti</p>';
         }
+    }
+}
+
+function toggleKBTags(elementId) {
+    const element = document.getElementById(elementId);
+    const button = event.target;
+    if (element.style.display === 'none') {
+        element.style.display = 'block';
+        button.innerHTML = button.innerHTML.replace('▶', '▼');
+    } else {
+        element.style.display = 'none';
+        button.innerHTML = button.innerHTML.replace('▼', '▶');
     }
 }
 
@@ -411,9 +456,11 @@ function init() {
     // Knowledge-base event listeners
     addKBBtn.addEventListener('click', () => kbModal.style.display = 'block');
     kbUploadForm.addEventListener('submit', handleKBUpload);
-    if (toggleKBEndpointBtn) {
-        toggleKBEndpointBtn.addEventListener('click', toggleKBEndpoint);
-        updateKBEndpointUI(); // Inizializza la UI con il valore di default
+    if (qdrantCollectionSelect) {
+        qdrantCollectionSelect.addEventListener('change', () => {
+            console.log(`📦 Collection changed to: ${getSelectedQdrantCollection()}`);
+            loadKBDocuments(); // Ricarica i documenti quando cambia la collection
+        });
     }
     
     // Focus sull'input

@@ -15,6 +15,10 @@ services:
       - FLASK_ENV=production
       - FLASK_APP=backend.py
       - N8N_API_KEY=M4tJ6z9pZfiHeSjcrdeU18Xq4QcrpN6nAxkcNFiaYjpUTROOgUp6zGwN3jXqT08dahmdA3341hvtiu46oMygyUjqf1ELbCDUpd3aVFxqMrUH2fxOFlqRO1XafsDhIhFu
+      # Qdrant configuration
+      - QDRANT_HOST=host.docker.internal
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=knowledge_base
     restart: unless-stopped
     networks:
       - agentcore-network

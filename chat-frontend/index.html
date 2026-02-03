@@ -716,8 +716,10 @@
                 <div class="section-header">
                     <h1>📚 Knowledge-base</h1>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <span id="kbEndpointLabel" style="font-size: 0.9em; color: var(--text-secondary);">Endpoint: <strong>prod</strong></span>
-                        <button id="toggleKBEndpointBtn" class="secondary-btn" style="font-size: 0.85em; padding: 5px 12px;">🔄 Switch</button>
+                        <label for="qdrantCollectionSelect" style="font-size: 0.9em; color: var(--text-secondary);">Collection:</label>
+                        <select id="qdrantCollectionSelect" style="padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary);">
+                            <option value="meetings_notes" selected>meetings_notes</option>
+                        </select>
                         <button id="addKBBtn" class="primary-btn">+ Aggiungi</button>
                     </div>
                 </div>

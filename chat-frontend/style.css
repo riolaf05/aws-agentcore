@@ -1726,3 +1726,79 @@ body {
     align-items: center;
     gap: 8px;
 }
+
+/* Tags per Knowledge Base */
+.kb-tags-collapse {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.kb-tags-toggle {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    width: fit-content;
+}
+
+.kb-tags-toggle:hover {
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    transform: translateY(-1px);
+}
+
+.kb-tags-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-left: 8px;
+    padding-top: 4px;
+    border-left: 2px solid #667eea;
+    padding-left: 8px;
+}
+
+.kb-tag-item {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tag {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tag-goal {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.tag-date {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.tag-mode {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: white;
+}

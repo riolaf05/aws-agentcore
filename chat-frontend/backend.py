@@ -12,6 +12,13 @@ import boto3
 import json
 import logging
 import os
+from datetime import datetime
+
+# Import delle utilities custom
+from pdf_utils import extract_text_from_pdf, chunk_text
+from qdrant_utils import QdrantManager
+import hashlib
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 app = Flask(__name__)
 CORS(app)  # Abilita CORS per il frontend
@@ -55,9 +62,115 @@ N8N_WEBHOOK_KB_PROD = "http://host.docker.internal:5678/webhook/ae7ec17c-64fc-48
 # Token di autorizzazione per N8N (configura nel tuo ambiente)
 N8N_API_KEY = os.getenv('N8N_API_KEY', '')  # Imposta tramite variabile ambiente
 
+# Configurazione Qdrant
+QDRANT_HOST = os.getenv('QDRANT_HOST', 'host.docker.internal')
+QDRANT_PORT = int(os.getenv('QDRANT_PORT', '6333'))
+QDRANT_COLLECTION = os.getenv('QDRANT_COLLECTION', 'knowledge_base')
+QDRANT_VECTOR_SIZE = int(os.getenv('QDRANT_VECTOR_SIZE', '1536'))
+
 # Client AWS
 bedrock_client = boto3.client('bedrock-agentcore', region_name=REGION)
 lambda_client = boto3.client('lambda', region_name=REGION)
+
+# Qdrant Manager
+try:
+    qdrant_manager = QdrantManager(
+        host=QDRANT_HOST,
+        port=QDRANT_PORT,
+        collection_name=QDRANT_COLLECTION
+    )
+    logger.info(f"✅ Qdrant manager initialized: {QDRANT_HOST}:{QDRANT_PORT}")
+except Exception as e:
+    logger.warning(f"⚠️ Qdrant manager initialization failed: {e}")
+    qdrant_manager = None
+
+
+# ========== UTILITY FUNCTIONS ==========
+
+def _simple_hash_embedding(text, size=1536):
+    """Genera un embedding deterministico semplice (fallback) basato su hash."""
+    if not text:
+        return [0.0] * size
+    digest = hashlib.sha256(text.encode('utf-8')).digest()
+    return [(digest[i % len(digest)] / 255.0) for i in range(size)]
+
+
+def _parse_json_field(value, default=None):
+    if value is None:
+        return default
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+
+def identify_goal_from_text(text):
+    """Invoca l'agente project-goal-writer-reader per identificare il nome dell'obiettivo dal testo"""
+    import uuid
+    try:
+        # Prepara il prompt per l'agent
+        prompt = f"""Analizza il seguente testo e identifica il nome dell'obiettivo principale menzionato.
+Rispondi SOLO con il nome dell'obiettivo come stringa semplice, senza spiegazioni.
+Se non trovi nessun obiettivo, rispondi solo con la parola "vuoto".
+
+Testo:
+{text[:2000]}"""  # Limita a 2000 caratteri per non eccedere
+
+        logger.info(f"🧠 Agent prompt (goal identification): {prompt}")
+        logger.info(f"🔍 Calling project-goal-writer-reader agent to identify goal from text")
+        
+        # Invoca l'agente project-goal-writer-reader
+        agent_arn = "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt"
+        
+        payload_dict = {"prompt": prompt}
+        payload_data = json.dumps(payload_dict).encode('utf-8')
+        
+        response = bedrock_client.invoke_agent_runtime(
+            agentRuntimeArn=agent_arn,
+            runtimeSessionId=str(uuid.uuid4()),
+            payload=payload_data
+        )
+        
+        logger.info(f"Agent response contentType: {response.get('contentType')}")
+        
+        # Processa la risposta
+        content = []
+        if response.get("contentType") == "application/json":
+            for chunk in response.get("response", []):
+                content.append(chunk.decode('utf-8'))
+            result_str = ''.join(content)
+            logger.debug(f"Raw response: {result_str}")
+            result = json.loads(result_str)
+            if isinstance(result, dict):
+                goal_name = result.get('result', 'vuoto').strip()
+            else:
+                goal_name = str(result).strip()
+        else:
+            # Fallback per streaming o altri content types
+            for chunk in response.get("response", []):
+                if isinstance(chunk, bytes):
+                    content.append(chunk.decode('utf-8'))
+                else:
+                    content.append(str(chunk))
+            goal_name = ''.join(content).strip()
+        
+        # Pulisci la risposta da newline e whitespace
+        goal_name = goal_name.replace('\n', '').strip()
+        
+        if not goal_name or goal_name.lower() == 'vuoto':
+            logger.info(f"ℹ️ Agent returned no goal match")
+            logger.info(f"🧠 Agent response: vuoto")
+            return "vuoto"
+        
+        logger.info(f"✅ Agent identified goal: {goal_name}")
+        logger.info(f"🧠 Agent response: {goal_name}")
+        return goal_name
+        
+    except Exception as e:
+        logger.error(f"❌ Error identifying goal: {e}", exc_info=True)
+        return "vuoto"
+
 
 
 @app.route('/health', methods=['GET'])
@@ -1175,6 +1288,13 @@ def get_kb_documents():
         if 'body' in result:
             body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
             logger.info(f"Retrieved {body.get('count', 0)} KB documents")
+            
+            # Debug: mostra struttura dei documenti
+            if body.get('documents'):
+                logger.debug(f"📄 First document structure: {json.dumps(body['documents'][0], indent=2, default=str)}")
+                # Mostra i campi disponibili nel primo documento
+                logger.info(f"📋 Available fields in documents: {list(body['documents'][0].keys()) if body['documents'] else 'No documents'}")
+            
             return jsonify(body), result.get('statusCode', 200)
         
         return jsonify(result), 200
@@ -1186,82 +1306,122 @@ def get_kb_documents():
 
 @app.route('/api/kb', methods=['POST'])
 def create_kb_document():
-    """Carica un nuovo documento nella Knowledge Base - invia sia a Lambda che a N8N"""
+    """Carica un nuovo documento nella Knowledge Base - processa PDF, identifica goal, salva su Qdrant"""
     try:
-        # Ottieni l'endpoint (test o prod)
-        endpoint = request.form.get('endpoint', 'prod') if request.files else (request.get_json() or {}).get('endpoint', 'prod')
-        logger.info(f"📚 Creating KB document with endpoint: {endpoint}")
+        # Determina se è FormData o JSON
+        is_form_data = request.content_type and 'multipart/form-data' in request.content_type
+        
+        # Ottieni la collection Qdrant selezionata
+        if is_form_data:
+            collection = request.form.get('collection', 'meetings_notes')
+        else:
+            collection = (request.get_json() or {}).get('collection', 'meetings_notes')
+        
+        logger.info(f"📚 Creating KB document with collection: {collection}, is_form_data: {is_form_data}")
+        
+        # Variabili per gestire il testo
+        text_content = None
+        tipo = None
+        file_content = None
+        filename = None
         
         # Check if file or form data
-        if request.files:
-            # Handle file upload
+        if is_form_data:
+            # Handle FormData (file o testo)
             file = request.files.get('data')
             tipo = request.form.get('type', 'meeting-notes')
             
-            if file:
+            # Debug logging
+            logger.info(f"📋 FormData keys - files: {list(request.files.keys())}, form: {list(request.form.keys())}")
+            
+            if file and file.filename:
+                # File upload
                 logger.info(f"📚 Uploading KB file: {file.filename}")
+                filename = file.filename
                 
                 # Read file content
                 file_content = file.read()
                 
-                # Create multipart form data payload for Lambda
-                import base64
-                
-                # Create multipart body
-                boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
-                body_parts = []
-                body_parts.append(f'--{boundary}')
-                body_parts.append(f'Content-Disposition: form-data; name="data"; filename="{file.filename}"')
-                body_parts.append('Content-Type: application/pdf')
-                body_parts.append('')
-                body_parts.append(file_content.decode('latin-1'))
-                body_parts.append(f'--{boundary}')
-                body_parts.append(f'Content-Disposition: form-data; name="type"')
-                body_parts.append('')
-                body_parts.append(tipo)
-                body_parts.append(f'--{boundary}--')
-                
-                multipart_body = '\r\n'.join(body_parts)
-                
-                payload = {
-                    'body': multipart_body,
-                    'isBase64Encoded': False,
-                    'headers': {
-                        'content-type': f'multipart/form-data; boundary={boundary}'
-                    }
-                }
+                # 1️⃣ ESTRAI TESTO DAL PDF
+                if filename.lower().endswith('.pdf'):
+                    try:
+                        text_content = extract_text_from_pdf(file_content)
+                        logger.info(f"✅ PDF text extracted successfully")
+                    except Exception as pdf_error:
+                        logger.error(f"❌ Failed to extract PDF text: {pdf_error}")
+                        return jsonify({"error": f"Failed to extract PDF text: {str(pdf_error)}"}), 500
+                else:
+                    # Se non è PDF, prova a leggerlo come testo
+                    try:
+                        text_content = file_content.decode('utf-8')
+                    except:
+                        return jsonify({"error": "File must be PDF or text"}), 400
+            else:
+                # Testo inviato tramite FormData (senza file)
+                text_content = request.form.get('data', '')
+                logger.info(f"📚 Creating KB text document from FormData, text length: {len(text_content)}")
         else:
             # Handle JSON data
             data = request.get_json()
             tipo = data.get('type', 'meeting-notes')
-            text = data.get('data', '')
+            text_content = data.get('data', '')
             
-            logger.info(f"📚 Creating KB text document")
-            
-            # Create multipart body for text
-            boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
-            body_parts = []
-            body_parts.append(f'--{boundary}')
-            body_parts.append(f'Content-Disposition: form-data; name="data"')
-            body_parts.append('')
-            body_parts.append(text)
-            body_parts.append(f'--{boundary}')
-            body_parts.append(f'Content-Disposition: form-data; name="type"')
-            body_parts.append('')
-            body_parts.append(tipo)
-            body_parts.append(f'--{boundary}--')
-            
-            multipart_body = '\r\n'.join(body_parts)
-            
-            payload = {
-                'body': multipart_body,
-                'isBase64Encoded': False,
-                'headers': {
-                    'content-type': f'multipart/form-data; boundary={boundary}'
-                }
-            }
+            logger.info(f"📚 Creating KB text document from JSON")
         
-        # 1️⃣ Invoca Lambda
+        if not text_content:
+            return jsonify({"error": "No text content provided"}), 400
+        
+        # 2️⃣ IDENTIFICA L'OBIETTIVO DAL TESTO
+        goal_name = identify_goal_from_text(text_content)
+        logger.info(f"🎯 Identified goal: {goal_name}")
+        
+        # Data odierna
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        # Tags di sistema
+        storage_mode = 'parent-child'
+        tags = {
+            'is_parent': False,
+            'storage_mode': storage_mode,
+            'nome_obiettivo': goal_name,
+            'data_odierna': today
+        }
+        logger.info(f"📌 System tags: {tags}")
+        
+        # 3️⃣ PREPARA PAYLOAD PER LAMBDA (DynamoDB + S3) - include tags
+        import base64
+
+        if file_content and filename:
+            # Multipart con file
+            encoder = MultipartEncoder(
+                fields={
+                    'data': (filename, file_content, 'application/pdf'),
+                    'type': tipo,
+                    'tags': json.dumps(tags)
+                }
+            )
+        else:
+            # Multipart con testo
+            encoder = MultipartEncoder(
+                fields={
+                    'data': text_content,
+                    'type': tipo,
+                    'tags': json.dumps(tags)
+                }
+            )
+
+        body_bytes = encoder.to_string()
+        payload = {
+            'body': base64.b64encode(body_bytes).decode('utf-8'),
+            'isBase64Encoded': True,
+            'headers': {
+                'content-type': encoder.content_type
+            }
+        }
+        
+        # 4️⃣ Invoca Lambda (DynamoDB + S3)
+        logger.info(f"📤 Lambda payload content-type: {payload['headers'].get('content-type')}")
+        logger.info(f"📤 Lambda payload body preview (base64): {str(payload['body'])[:200]}")
         response = lambda_client.invoke(
             FunctionName=KB_POST_LAMBDA_ARN,
             InvocationType='RequestResponse',
@@ -1272,56 +1432,110 @@ def create_kb_document():
         payload_bytes = response['Payload'].read()
         result = json.loads(payload_bytes)
         
+        logger.info(f"📦 Lambda response statusCode: {result.get('statusCode')}, body preview: {str(result.get('body', ''))[:200]}")
+        
         if response['StatusCode'] != 200:
             return jsonify({"error": "Lambda invocation failed"}), 500
         
         # Estrai body se presente (formato API Gateway)
         lambda_success = False
+        document_id = None
         if 'body' in result:
             body = json.loads(result['body']) if isinstance(result['body'], str) else result['body']
+            document_id = body.get('document_id')
             lambda_success = True
-            logger.info(f"✅ KB document created in Lambda")
+            logger.info(f"✅ KB document created in Lambda with ID: {document_id}")
         else:
             body = result
+            document_id = body.get('document_id')
             lambda_success = True
         
-        # 2️⃣ Invia a N8N webhook (MUST succeed)
-        try:
-            webhook_url = N8N_WEBHOOK_KB_TEST if endpoint == 'test' else N8N_WEBHOOK_KB_PROD
-            
-            # Prepara payload per N8N (semplice JSON)
-            n8n_payload = {
-                'type': tipo,
-                'endpoint': endpoint,
-                'timestamp': json.loads(result.get('body', '{}')).get('created_at', '')
-            }
-            
-            logger.info(f"📡 Sending to N8N webhook: {webhook_url}")
-            logger.info(f"📡 N8N Payload: {json.dumps(n8n_payload)}")
-            
-            import requests
-            
-            # Prepara headers con autenticazione
-            headers = {'Content-Type': 'application/json'}
-            if N8N_API_KEY:
-                headers['x-api-key'] = N8N_API_KEY
-            
-            n8n_response = requests.post(webhook_url, json=n8n_payload, headers=headers, timeout=10)
-            logger.info(f"N8N webhook response: {n8n_response.status_code} - {n8n_response.text}")
-            
-            # Controlla che il webhook sia riuscito (2xx status code)
-            if n8n_response.status_code < 200 or n8n_response.status_code >= 300:
-                logger.error(f"❌ N8N webhook failed with status {n8n_response.status_code}: {n8n_response.text}")
-                return jsonify({"error": f"N8N webhook failed with status {n8n_response.status_code}"}), 500
-            
-            logger.info(f"✅ N8N webhook succeeded")
-            
-        except Exception as webhook_error:
-            logger.error(f"❌ N8N webhook error: {str(webhook_error)}", exc_info=True)
-            return jsonify({"error": f"N8N webhook error: {str(webhook_error)}"}), 500
+        # 5️⃣ Chunking + salvataggio su Qdrant (parent-child)
+        if not qdrant_manager:
+            return jsonify({"error": "Qdrant not available"}), 503
+
+        # Data odierna
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # Payload aggiuntivo fornito dal client
+        if is_form_data:
+            extra_payload = _parse_json_field(request.form.get('payload')) or _parse_json_field(request.form.get('metadata')) or {}
+            chunk_size = int(request.form.get('chunk_size', 1000))
+            chunk_overlap = int(request.form.get('chunk_overlap', 200))
+            provided_chunks = _parse_json_field(request.form.get('chunks'))
+            provided_embeddings = _parse_json_field(request.form.get('embeddings'))
+        else:
+            data_json = request.get_json() or {}
+            extra_payload = data_json.get('payload') or data_json.get('metadata') or {}
+            chunk_size = int(data_json.get('chunk_size', 1000))
+            chunk_overlap = int(data_json.get('chunk_overlap', 200))
+            provided_chunks = data_json.get('chunks')
+            provided_embeddings = data_json.get('embeddings')
+
+        if not isinstance(extra_payload, dict):
+            extra_payload = {}
+
+        # Prepara chunks
+        chunks = []
+        if isinstance(provided_chunks, list) and provided_chunks:
+            # Usa chunks già forniti
+            for idx, ch in enumerate(provided_chunks):
+                if isinstance(ch, dict):
+                    chunks.append({
+                        'id': ch.get('id', idx),
+                        'text': ch.get('text', ''),
+                        'embedding': ch.get('embedding') or _simple_hash_embedding(ch.get('text', ''), QDRANT_VECTOR_SIZE),
+                        'metadata': ch.get('metadata', {})
+                    })
+        else:
+            # Chunking automatico dal testo
+            text_chunks = chunk_text(text_content, chunk_size=chunk_size, overlap=chunk_overlap)
+            for idx, ch_text in enumerate(text_chunks):
+                if isinstance(provided_embeddings, list) and idx < len(provided_embeddings):
+                    embedding = provided_embeddings[idx]
+                else:
+                    embedding = _simple_hash_embedding(ch_text, QDRANT_VECTOR_SIZE)
+                chunks.append({
+                    'id': idx,
+                    'text': ch_text,
+                    'embedding': embedding
+                })
+
+        # Metadata finale con tags di sistema (già generati sopra)
+        metadata = {
+            **tags,  # Includi i tags già generati: is_parent, storage_mode, nome_obiettivo, data_odierna
+            **extra_payload
+        }
+
+        # Imposta temporaneamente la collection scelta dall'utente
+        original_collection = qdrant_manager.collection_name
+        qdrant_manager.collection_name = collection
         
-        # Ritorna successo solo se sia Lambda che N8N hanno funzionato
-        return jsonify(body), result.get('statusCode', 201)
+        try:
+            # Salva su Qdrant (parent-child mode)
+            qdrant_manager.save_chunks(
+                chunks,
+                metadata,
+                storage_mode=storage_mode,
+                parent_text=text_content,
+                vector_size=QDRANT_VECTOR_SIZE
+            )
+            logger.info(f"✅ Saved {len(chunks)} chunks to Qdrant collection '{collection}' (mode: {storage_mode}) with tags: {tags}")
+        finally:
+            # Ripristina la collection originale
+            qdrant_manager.collection_name = original_collection
+        
+        # Ritorna successo con metadata aggiuntivi
+        response_body = body.copy() if isinstance(body, dict) else {"result": body}
+        response_body['goal_identified'] = goal_name
+        response_body['date'] = today
+        response_body['tags'] = tags
+        response_body['document_id'] = document_id
+        
+        logger.info(f"🔵 Returning response with tags: {response_body.get('tags')}")
+        logger.debug(f"Full response structure: {json.dumps({k: str(v)[:100] if not isinstance(v, (dict, list)) else '...' for k, v in response_body.items()}, indent=2)}")
+        
+        return jsonify(response_body), result.get('statusCode', 201)
         
     except Exception as e:
         logger.error(f"❌ Error creating KB document: {str(e)}", exc_info=True)
@@ -1365,7 +1579,49 @@ def delete_kb_document(document_id):
         return jsonify(result), 200
         
     except Exception as e:
-        logger.error(f"❌ Error deleting KB document: {str(e)}", exc_info=True)
+        logger.info(f"❌ Error deleting KB document: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+
+@app.route('/api/kb/search', methods=['POST'])
+def search_kb_qdrant():
+    """Cerca nella Knowledge Base usando Qdrant con filtri sul payload"""
+    try:
+        data = request.get_json()
+        
+        # Estrai parametri
+        query_vector = data.get('query_vector')  # Vettore embedding della query
+        filter_payload = data.get('filter', {})  # Filtri (es. {"nome_obiettivo": "Obiettivo1"})
+        limit = data.get('limit', 10)
+        
+        if not query_vector:
+            return jsonify({"error": "query_vector is required"}), 400
+        
+        logger.info(f"🔍 Searching Qdrant with filters: {filter_payload}")
+        
+        if not qdrant_manager:
+            return jsonify({"error": "Qdrant not available"}), 503
+        
+        # Cerca su Qdrant usando il manager
+        results = qdrant_manager.search(query_vector, filters=filter_payload, limit=limit)
+        
+        # Formatta risultati
+        formatted_results = []
+        for hit in results:
+            formatted_results.append({
+                'id': hit.id,
+                'score': hit.score,
+                'payload': hit.payload
+            })
+        
+        logger.info(f"✅ Found {len(formatted_results)} results")
+        return jsonify({
+            'results': formatted_results,
+            'count': len(formatted_results)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Error searching KB: {str(e)}", exc_info=True)
         return jsonify({"error": f"Errore: {str(e)}"}), 500
 
 
