@@ -28,6 +28,14 @@ logger = logging.getLogger(__name__)
 
 # Configurazione AWS
 ORCHESTRATOR_ARN = "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/orchestrator-HR2F4m7QCY"
+PROJECT_GOAL_WRITER_READER_ARN = os.getenv(
+    "PROJECT_GOAL_WRITER_READER_ARN",
+    "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt"
+)
+PROJECT_UPDATES_EXTRACTOR_ARN = os.getenv(
+    "PROJECT_UPDATES_EXTRACTOR_ARN",
+    "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_updates_extractor-58Njxi3hnT"
+)
 REGION = "us-east-1"
 
 # ARN Lambda (aggiornati dopo il deploy)
@@ -120,40 +128,16 @@ Testo:
         logger.info(f"🧠 Agent prompt (goal identification): {prompt}")
         logger.info(f"🔍 Calling project-goal-writer-reader agent to identify goal from text")
         
-        # Invoca l'agente project-goal-writer-reader
-        agent_arn = "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt"
-        
-        payload_dict = {"prompt": prompt}
-        payload_data = json.dumps(payload_dict).encode('utf-8')
-        
-        response = bedrock_client.invoke_agent_runtime(
-            agentRuntimeArn=agent_arn,
-            runtimeSessionId=str(uuid.uuid4()),
-            payload=payload_data
-        )
+        response = _invoke_agent_runtime(PROJECT_GOAL_WRITER_READER_ARN, {"prompt": prompt})
         
         logger.info(f"Agent response contentType: {response.get('contentType')}")
         
         # Processa la risposta
-        content = []
-        if response.get("contentType") == "application/json":
-            for chunk in response.get("response", []):
-                content.append(chunk.decode('utf-8'))
-            result_str = ''.join(content)
-            logger.debug(f"Raw response: {result_str}")
-            result = json.loads(result_str)
-            if isinstance(result, dict):
-                goal_name = result.get('result', 'vuoto').strip()
-            else:
-                goal_name = str(result).strip()
+        result = _parse_agent_response(response)
+        if isinstance(result, dict):
+            goal_name = result.get('result', 'vuoto').strip()
         else:
-            # Fallback per streaming o altri content types
-            for chunk in response.get("response", []):
-                if isinstance(chunk, bytes):
-                    content.append(chunk.decode('utf-8'))
-                else:
-                    content.append(str(chunk))
-            goal_name = ''.join(content).strip()
+            goal_name = str(result).strip()
         
         # Pulisci la risposta da newline e whitespace
         goal_name = goal_name.replace('\n', '').strip()
@@ -170,6 +154,88 @@ Testo:
     except Exception as e:
         logger.error(f"❌ Error identifying goal: {e}", exc_info=True)
         return "vuoto"
+
+
+def _invoke_agent_runtime(agent_arn, payload_dict):
+    import uuid
+    payload_data = json.dumps(payload_dict).encode('utf-8')
+    return bedrock_client.invoke_agent_runtime(
+        agentRuntimeArn=agent_arn,
+        runtimeSessionId=str(uuid.uuid4()),
+        payload=payload_data
+    )
+
+
+def _parse_agent_response(response):
+    content = []
+    if response.get("contentType") == "application/json":
+        for chunk in response.get("response", []):
+            content.append(chunk.decode('utf-8'))
+        result_str = ''.join(content)
+        logger.debug(f"Raw response: {result_str}")
+        try:
+            return json.loads(result_str)
+        except Exception:
+            return result_str
+
+    for chunk in response.get("response", []):
+        if isinstance(chunk, bytes):
+            content.append(chunk.decode('utf-8'))
+        else:
+            content.append(str(chunk))
+    return ''.join(content).strip()
+
+
+def _extract_text_from_agent_result(result):
+    if isinstance(result, dict):
+        content = result.get('content')
+        if isinstance(content, list) and content:
+            first = content[0]
+            if isinstance(first, dict) and 'text' in first:
+                return first['text']
+    if isinstance(result, str):
+        return result
+    return str(result)
+
+
+def extract_project_updates_from_text(text):
+    try:
+        payload = {"text": text[:4000]}
+        response = _invoke_agent_runtime(PROJECT_UPDATES_EXTRACTOR_ARN, payload)
+        result = _parse_agent_response(response)
+
+        if isinstance(result, dict) and all(k in result for k in ["avanzamenti", "cose_da_fare", "punti_attenzione"]):
+            return result
+
+        raw_text = _extract_text_from_agent_result(result).strip()
+        if raw_text.startswith("```"):
+            raw_text = raw_text.split("\n", 1)[-1]
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
+        return json.loads(raw_text)
+    except Exception as e:
+        logger.error(f"❌ Error extracting project updates: {e}", exc_info=True)
+        return {"avanzamenti": [], "cose_da_fare": [], "punti_attenzione": []}
+
+
+def update_goal_with_advancements(goal_name, updates):
+    try:
+        avanzamenti = updates.get("avanzamenti", []) if isinstance(updates, dict) else []
+        if not avanzamenti:
+            logger.info("ℹ️ No advancements to update for goal")
+            return
+
+        note_lines = "\n".join([f"- {a}" for a in avanzamenti])
+        prompt = (
+            f"Cerca l'obiettivo '{goal_name}' e aggiungi una nota di avanzamento con i seguenti punti:\n"
+            f"{note_lines}"
+        )
+
+        response = _invoke_agent_runtime(PROJECT_GOAL_WRITER_READER_ARN, {"prompt": prompt})
+        _ = _parse_agent_response(response)
+        logger.info("✅ Goal updated with advancements")
+    except Exception as e:
+        logger.error(f"❌ Error updating goal with advancements: {e}", exc_info=True)
 
 
 
@@ -224,12 +290,28 @@ def invoke_orchestrator():
             
             # Prima prova il formato agent: {"role": "assistant", "content": [{"text": "..."}]}
             if isinstance(result_data, dict):
-                if 'content' in result_data and isinstance(result_data['content'], list):
-                    # Estrai il testo dal primo elemento content
-                    if len(result_data['content']) > 0 and isinstance(result_data['content'][0], dict):
-                        if 'text' in result_data['content'][0]:
-                            result = result_data['content'][0]['text']
-                            logger.debug(f"✓ Extracted text from content[0].text")
+                logger.debug(f"result_data is dict, checking 'content' field...")
+                if 'content' in result_data:
+                    content_field = result_data['content']
+                    logger.debug(f"content field type: {type(content_field)}")
+                    
+                    if isinstance(content_field, list):
+                        logger.debug(f"content is list with {len(content_field)} elements")
+                        # Estrai il testo dal primo elemento content
+                        if len(content_field) > 0:
+                            first_elem = content_field[0]
+                            logger.debug(f"First element type: {type(first_elem)}")
+                            if isinstance(first_elem, dict) and 'text' in first_elem:
+                                result = first_elem['text']
+                                logger.debug(f"✓ Extracted text from content[0].text")
+                    elif isinstance(content_field, str):
+                        # Content è direttamente una stringa
+                        result = content_field
+                        logger.debug(f"✓ Extracted from content field (string)")
+                    elif isinstance(content_field, dict) and 'text' in content_field:
+                        # Content è un dict con field text
+                        result = content_field['text']
+                        logger.debug(f"✓ Extracted from content.text")
                 
                 # Poi prova i campi standard, ma estrai testo se sono dict
                 if result is None and 'result' in result_data:
@@ -1374,6 +1456,13 @@ def create_kb_document():
         # 2️⃣ IDENTIFICA L'OBIETTIVO DAL TESTO
         goal_name = identify_goal_from_text(text_content)
         logger.info(f"🎯 Identified goal: {goal_name}")
+
+        # 2.1️⃣ Estrai aggiornamenti dal testo e aggiorna il goal se presente
+        project_updates = extract_project_updates_from_text(text_content)
+        logger.info(f"🧩 Project updates extracted: {project_updates}")
+
+        if goal_name and goal_name.lower() != "vuoto":
+            update_goal_with_advancements(goal_name, project_updates)
         
         # Data odierna
         today = datetime.now().strftime("%Y-%m-%d")
