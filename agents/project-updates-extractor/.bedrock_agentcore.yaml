@@ -1,19 +1,19 @@
-default_agent: orchestrator
+default_agent: project_updates_extractor
 agents:
-  orchestrator:
-    name: orchestrator
-    entrypoint: C:/Users/r.laface/Desktop/Codice/aws-agentcore/agents/orchestrator/agent.py
+  project_updates_extractor:
+    name: project_updates_extractor
+    entrypoint: C:/Users/r.laface/Desktop/Codice/aws-agentcore/agents/project-updates-extractor/agent.py
     deployment_type: container
     runtime_type: null
     platform: linux/arm64
-    container_runtime: none
-    source_path: C:\Users\r.laface\Desktop\Codice\aws-agentcore\agents\orchestrator
+    container_runtime: docker
+    source_path: C:\Users\r.laface\Desktop\Codice\aws-agentcore\agents\project-updates-extractor
     aws:
-      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-11376b7e2a
+      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-d5583ae0fe
       execution_role_auto_create: false
       account: '879338784410'
       region: us-east-1
-      ecr_repository: 879338784410.dkr.ecr.us-east-1.amazonaws.com/bedrock-agentcore-orchestrator
+      ecr_repository: 879338784410.dkr.ecr.us-east-1.amazonaws.com/bedrock-agentcore-project_updates_extractor
       ecr_auto_create: false
       s3_path: null
       s3_auto_create: false
@@ -28,20 +28,20 @@ agents:
         idle_runtime_session_timeout: null
         max_lifetime: null
     bedrock_agentcore:
-      agent_id: orchestrator-HR2F4m7QCY
-      agent_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/orchestrator-HR2F4m7QCY
-      agent_session_id: 7a49def6-b663-48ad-8c92-1cc7c274a800
+      agent_id: project_updates_extractor-58Njxi3hnT
+      agent_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_updates_extractor-58Njxi3hnT
+      agent_session_id: 87d6a47b-6764-44ac-b961-9d1d5fac9146
     codebuild:
-      project_name: bedrock-agentcore-orchestrator-builder
-      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-11376b7e2a
+      project_name: bedrock-agentcore-project_updates_extractor-builder
+      execution_role: arn:aws:iam::879338784410:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-d5583ae0fe
       source_bucket: bedrock-agentcore-codebuild-sources-879338784410-us-east-1
     memory:
       mode: STM_AND_LTM
       memory_id: orchestrator_mem-SyV4bj45mc
-      memory_arn: arn:aws:bedrock-agentcore:us-east-1:879338784410:memory/orchestrator_mem-SyV4bj45mc
-      memory_name: orchestrator_mem
+      memory_arn: null
+      memory_name: project_updates_extractor_memory
       event_expiry_days: 30
-      first_invoke_memory_check_done: true
+      first_invoke_memory_check_done: false
       was_created_by_toolkit: false
     identity:
       credential_providers: []

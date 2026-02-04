@@ -2,11 +2,17 @@ import json
 import uuid
 import boto3
 
-agent_arn = "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/taskwriter-7bQLcV8WPt"
-prompt = "Crea un task con titolo: Setup testing framework"
+# Invoca project-goal-writer-reader per identificare l'obiettivo dal testo
+agent_arn = "arn:aws:bedrock-agentcore:us-east-1:879338784410:runtime/project_goal_writer_reader-61UCrz38Qt"
+prompt = """Analizza il seguente testo e identifica il nome dell'obiettivo principale menzionato.
+Rispondi SOLO con il nome dell'obiettivo come stringa semplice, senza spiegazioni.
+Se non trovi nessun obiettivo, rispondi solo con la parola "vuoto".
+
+Testo:
+ciao, questo è un aggiornamento su ars alimentaria"""
 
 # Initialize the Amazon Bedrock AgentCore client
-agent_core_client = boto3.client('bedrock-agentcore')
+agent_core_client = boto3.client('bedrock-agentcore', region_name='us-east-1')
 
 # Prepare the payload
 payload = json.dumps({"prompt": prompt}).encode()
@@ -22,4 +28,12 @@ response = agent_core_client.invoke_agent_runtime(
 content = []
 for chunk in response.get("response", []):
     content.append(chunk.decode('utf-8'))
-print(json.loads(''.join(content)))
+result = ''.join(content)
+print("Raw response:")
+print(result)
+print("\nParsed:")
+try:
+    parsed = json.loads(result)
+    print(json.dumps(parsed, indent=2, ensure_ascii=False))
+except:
+    print(result)

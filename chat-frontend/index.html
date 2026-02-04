@@ -66,6 +66,10 @@
                 <span class="nav-icon">📍</span>
                 <span class="nav-text">Eventi&Luoghi</span>
             </a>
+            <a href="#" class="nav-item" data-view="knowledge-base">
+                <span class="nav-icon">📚</span>
+                <span class="nav-text">Knowledge-base</span>
+            </a>
         </nav>
     </div>
 
@@ -706,6 +710,57 @@
         </div>
     </div>
 
+        <!-- Knowledge-base View -->
+        <div id="knowledge-baseView" class="view">
+            <div class="section-container">
+                <div class="section-header">
+                    <h1>📚 Knowledge-base</h1>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="qdrantCollectionSelect" style="font-size: 0.9em; color: var(--text-secondary);">Collection:</label>
+                        <select id="qdrantCollectionSelect" style="padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary);">
+                            <option value="meetings_notes" selected>meetings_notes</option>
+                        </select>
+                        <button id="addKBBtn" class="primary-btn">+ Aggiungi</button>
+                    </div>
+                </div>
+
+                <!-- Knowledge-base Upload Modal -->
+                <div id="kbModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2>📤 Aggiungi documento alla Knowledge-base</h2>
+                            <button class="modal-close" onclick="closeKBModal()">&times;</button>
+                        </div>
+                        <form id="kbUploadForm" onsubmit="handleKBUpload(event)">
+                            <div class="form-group">
+                                <label for="kbType">Tipo di documento</label>
+                                <select id="kbType" required>
+                                    <option value="meeting-notes" selected>meeting-notes</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="kbFile">Seleziona file PDF (opzionale)</label>
+                                <input type="file" id="kbFile" accept=".pdf">
+                                <small>Formato: PDF</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="kbText">Note / Descrizione</label>
+                                <textarea id="kbText" rows="6" placeholder="Descrizione o note aggiuntive del documento..."></textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="primary-btn">📤 Upload</button>
+                                <button type="button" class="secondary-btn" onclick="closeKBModal()">Annulla</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Knowledge-base List -->
+                <div id="kbList" class="items-list">
+                    <p class="loading">Caricamento documenti...</p>
+                </div>
+            </div>
+        </div>
     </div> <!-- Fine mainApp -->
 
     <script src="cognito-config.js"></script>

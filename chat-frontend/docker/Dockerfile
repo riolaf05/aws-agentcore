@@ -36,6 +36,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copia il codice dell'applicazione dal parent directory
 COPY ../backend.py .
+COPY ../pdf_utils.py .
+COPY ../qdrant_utils.py .
 COPY ../index.html .
 COPY ../app.js .
 COPY ../style.css .

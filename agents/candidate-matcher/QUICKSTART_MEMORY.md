@@ -92,26 +92,30 @@ Output finale:
 
 ## 🧪 Test della Memory
 
-### Test 1: Single Message (senza memory)
+### Test 1: Single Message (senza memory) - PowerShell
 
-```bash
-agentcore invoke '{"prompt":"Sono Marco, sviluppatore Python con 8 anni di esperienza"}'
+```powershell
+$Payload = @{ prompt = "Sono Marco, sviluppatore Python con 8 anni di esperienza" } | ConvertTo-Json -Compress
+agentcore invoke $Payload
 ```
 
-### Test 2: Multi-Turn with Memory ⭐
+### Test 2: Multi-Turn with Memory ⭐ - PowerShell
 
-```bash
+```powershell
 # Crea una sessione unica
-SESSION_ID="test-$(date +%s)"
+$SessionId = "test-$((Get-Date).ToString('yyyyMMddHHmmss'))"
 
-echo "Turno 1: Presentazione..."
-agentcore invoke '{"prompt":"Sono Marco, sviluppatore Python","session_id":"'$SESSION_ID'"}'
+Write-Host "Turno 1: Presentazione..."
+$Payload = @{ prompt = "Sono Marco, sviluppatore Python"; session_id = $SessionId } | ConvertTo-Json -Compress
+agentcore invoke $Payload
 
-echo "Turno 2: Memory viene caricata..."
-agentcore invoke '{"prompt":"8 anni di esperienza, so AWS e Docker","session_id":"'$SESSION_ID'"}'
+Write-Host "Turno 2: Memory viene caricata..."
+$Payload = @{ prompt = "8 anni di esperienza, so AWS e Docker"; session_id = $SessionId } | ConvertTo-Json -Compress
+agentcore invoke $Payload
 
-echo "Turno 3: Continua naturalmente..."
-agentcore invoke '{"prompt":"Parlo inglese fluentemente","session_id":"'$SESSION_ID'"}'
+Write-Host "Turno 3: Continua naturalmente..."
+$Payload = @{ prompt = "Parlo inglese fluentemente"; session_id = $SessionId } | ConvertTo-Json -Compress
+agentcore invoke $Payload
 ```
 
 **Aspettative:**
@@ -119,31 +123,34 @@ agentcore invoke '{"prompt":"Parlo inglese fluentemente","session_id":"'$SESSION
 - Turno 2: **Vedi `📚 Caricati X messaggi dalla memoria`** ✅
 - Turno 3: L'agente non ripete domande, continua naturalmente
 
-### Test 3: Matching Completo
+### Test 3: Matching Completo - PowerShell
 
-```bash
-SESSION="full-interview-$(date +%s)"
+```powershell
+$Session = "full-interview-$((Get-Date).ToString('yyyyMMddHHmmss'))"
 
 # Turno 1: Ruolo attuale
-agentcore invoke '{
-  "prompt": "Ciao, sono Paolo. Sono un Senior Data Scientist con 10 anni di esperienza",
-  "session_id": "'$SESSION'",
-  "candidate_id": "paolo-data-scientist"
-}'
+$Payload = @{ 
+  prompt = "Ciao, sono Paolo. Sono un Senior Data Scientist con 10 anni di esperienza";
+  session_id = $Session;
+  candidate_id = "paolo-data-scientist"
+} | ConvertTo-Json -Compress
+agentcore invoke $Payload
 
 # Turno 2: Skills aggiuntive
-agentcore invoke '{
-  "prompt": "Conosco Python, R, SQL, e ho esperienza con ML e Big Data",
-  "session_id": "'$SESSION'",
-  "candidate_id": "paolo-data-scientist"
-}'
+$Payload = @{ 
+  prompt = "Conosco Python, R, SQL, e ho esperienza con ML e Big Data";
+  session_id = $Session;
+  candidate_id = "paolo-data-scientist"
+} | ConvertTo-Json -Compress
+agentcore invoke $Payload
 
 # Turno 3: Troverai i matching
-agentcore invoke '{
-  "prompt": "Sono pronto, cercami i migliori needs",
-  "session_id": "'$SESSION'",
-  "candidate_id": "paolo-data-scientist"
-}'
+$Payload = @{ 
+  prompt = "Sono pronto, cercami i migliori needs";
+  session_id = $Session;
+  candidate_id = "paolo-data-scientist"
+} | ConvertTo-Json -Compress
+agentcore invoke $Payload
 ```
 
 ---
