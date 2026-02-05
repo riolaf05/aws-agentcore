@@ -211,6 +211,10 @@ asws-agentcore/
 - Bedrock AgentCore Toolkit (`pip install bedrock-agentcore-starter-toolkit`)
 - Telegram Bot Token (da [@BotFather](https://t.me/BotFather))
 - Azure App Registration (per Outlook MCP) *(opzionale)*
+- Avviare la VM Qdrant (candidati) con:
+  ```powershell
+  aws ec2 start-instances --instance-ids i-0d0048fef11dff830
+  ```
 
 ### Installazione
 
